@@ -394,13 +394,25 @@
     }
 
     function contextualPrompt() {
+      // Determine if user is playing as white or black
+      const isUserWhite = sideToMove === "white";
+      
+      // Convert evaluation to user's perspective
+      const userEval = isUserWhite ? evalBefore : -evalBefore;
+      
       if (mateBefore !== null && mateBefore !== undefined) {
-        return mateBefore > 0 ? "Find the fastest mate" : "Find the only move to avoid mate";
+        const userMate = isUserWhite ? mateBefore : -mateBefore;
+        if (userMate > 0) {
+          return "Find the fastest mate";
+        } else if (userMate < 0) {
+          return "Find the only move to avoid mate";
+        }
       }
-      if (evalBefore > 2) return "Find the move to keep your advantage";
-      if (evalBefore > 0.5) return "Maintain the pressure with the best move";
-      if (evalBefore < -2) return "Find the move to stay in the game";
-      if (evalBefore < -0.5) return "Find the best defensive resource";
+      
+      if (userEval > 2) return "Find the move to keep your advantage";
+      if (userEval > 0.5) return "Maintain the pressure with the best move";
+      if (userEval < -2) return "Find the move to stay in the game";
+      if (userEval < -0.5) return "Find the best defensive resource";
       return "Find the best move in this balanced position";
     }
 
