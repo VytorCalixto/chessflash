@@ -68,6 +68,7 @@
       <th>Time</th>
       <th>Opening</th>
       <th>Status</th>
+      <th>Analysis</th>
     </tr>
   </thead>
   <tbody>
@@ -79,9 +80,18 @@
       <td>{{.TimeClass}}</td>
       <td>{{.OpeningName}}</td>
       <td><a href="/games/{{.ID}}">{{.AnalysisStatus}}</a></td>
+      <td>
+        {{if or (eq .AnalysisStatus "pending") (eq .AnalysisStatus "failed")}}
+        <form method="post" action="/games/{{.ID}}/queue-analysis">
+          <button class="button is-small is-primary" type="submit">Analyze</button>
+        </form>
+        {{else}}
+        <span class="tag is-light is-small">{{.AnalysisStatus}}</span>
+        {{end}}
+      </td>
     </tr>
     {{else}}
-    <tr><td colspan="6">No games yet.</td></tr>
+    <tr><td colspan="7">No games yet.</td></tr>
     {{end}}
   </tbody>
 </table>

@@ -142,12 +142,6 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		log.Debug("evalBefore: %+v", evalBefore)
 		log.Debug("evalAfter: %+v", evalAfter)
 
-		// Only create flashcards for moves made by the user (i even -> white, i odd -> black)
-		isPlayerMove := isWhiteMove == userIsWhite
-		if !isPlayerMove {
-			continue
-		}
-
 		classification := analysis.ClassifyMove(evalBefore.CP, evalAfter.CP, isWhiteMove)
 		log.Debug("classification: %s", classification)
 
@@ -173,6 +167,12 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		})
 		if err != nil {
 			log.Warn("failed to insert position for move %d: %v", i+1, err)
+			continue
+		}
+
+		// Only create flashcards for moves made by the user (i even -> white, i odd -> black)
+		isPlayerMove := isWhiteMove == userIsWhite
+		if !isPlayerMove {
 			continue
 		}
 

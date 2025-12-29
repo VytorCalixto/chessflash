@@ -17,6 +17,7 @@ func (s *Server) Routes() http.Handler {
 	r.Post("/resume-analysis", s.handleResumeAnalysis)
 	r.Get("/games", s.handleGames)
 	r.Get("/games/{id}", s.handleGameDetail)
+	r.Post("/games/{id}/queue-analysis", s.handleQueueGameAnalysis)
 	r.Get("/flashcards", s.handleFlashcards)
 	r.Post("/flashcards/{id}/review", s.handleReviewFlashcard)
 	r.Get("/openings", s.handleOpenings)

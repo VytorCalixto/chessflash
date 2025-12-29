@@ -1,32 +1,438 @@
 {{define "pages/game_detail.html"}}
 {{template "head" .}}
-<h1 class="title is-4">Game vs {{.game.Opponent}} ({{.game.TimeClass}})</h1>
-<p>Result: {{.game.Result}} | Opening: {{.game.OpeningName}} ({{.game.ECOCode}})</p>
+<style>
+  .analysis-layout {
+    display: grid;
+    grid-template-columns: minmax(520px, 1fr) minmax(320px, 360px);
+    gap: 1.5rem;
+  }
+  .board-area {
+    display: flex;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  .board-wrapper {
+    width: 480px;
+    height: 480px;
+    max-width: 100%;
+  }
+  .cg-wrap { width: 100%; height: 100%; }
+  .eval-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 32px;
+    flex-shrink: 0;
+    margin-right: 4px;
+  }
+  .eval-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 4px 5px;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-bottom: none;
+  }
+  .eval-label.white-advantage { background: #fff; color: #222; }
+  .eval-label.black-advantage { background: #262421; color: #fff; border-color: #262421; }
+  .eval-track {
+    position: relative;
+    width: 100%;
+    height: 480px;
+    overflow: hidden;
+    background: #262421;
+    border: 1px solid #262421;
+    box-sizing: border-box;
+  }
+  .eval-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    transition: height 0.25s ease;
+  }
+  .nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .nav-buttons .button { min-width: 44px; }
+  .move-list {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    max-height: 520px;
+    overflow-y: auto;
+  }
+  .move-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 1fr;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 6px;
+    border-bottom: 1px solid #f1f1f1;
+  }
+  .move-row:nth-child(2n) { background: #fafafa; }
+  .move-num { font-weight: 700; color: #555; }
+  .move-cell {
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    border: 1px solid transparent;
+  }
+  .move-cell .tags { font-size: 0.75rem; }
+  .move-cell .small-note { font-size: 0.75rem; color: #666; }
+  .move-cell.active { border-color: #485fc7; box-shadow: 0 0 0 1px #485fc7 inset; }
+  .tag.is-blunder { background: #f14668; color: #fff; }
+  .tag.is-mistake { background: #ff9f1c; color: #222; }
+  .tag.is-inaccuracy { background: #ffe08a; color: #222; }
+  .tag.is-good { background: #48c78e; color: #fff; }
+  .best-move-note { font-size: 0.85rem; color: #555; margin-top: 0.4rem; }
+  .player-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+  }
+  .player-info .player-name {
+    font-weight: 600;
+  }
+  .player-info .piece-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+  }
+  .player-info .piece-icon.white {
+    background: #fff;
+    border: 1px solid #ccc;
+  }
+  .player-info .piece-icon.black {
+    background: #262421;
+    border: 1px solid #262421;
+  }
+  .info-box {
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 0.75rem;
+  }
+  .move-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  @media (max-width: 1080px) {
+    .analysis-layout {
+      grid-template-columns: 1fr;
+    }
+    .board-wrapper {
+      height: auto;
+      aspect-ratio: 1;
+    }
+    .eval-track {
+      height: 100%;
+      min-height: 320px;
+    }
+  }
+</style>
 
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Move</th>
-      <th>Best move</th>
-      <th>Δ eval (cp)</th>
-      <th>Classification</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .positions}}
-    <tr>
-      <td>{{.MoveNumber}}</td>
-      <td>{{.MovePlayed}}</td>
-      <td>{{.BestMove}}</td>
-      <td>{{printf "%.0f" .EvalDiff}}</td>
-      <td>{{.Classification}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="5">Analysis pending or not available.</td></tr>
-    {{end}}
-  </tbody>
-</table>
-{{template "foot" .}}
+<h1 class="title is-4">Game vs {{.game.Opponent}} ({{.game.TimeClass}})</h1>
+<p class="mb-4">Result: {{.game.Result}} | Opening: {{.game.OpeningName}} ({{.game.ECOCode}})</p>
+
+{{if .positions}}
+<div class="analysis-layout">
+  <div>
+    <div class="player-info" id="player-top">
+      <span class="piece-icon" id="icon-top"></span>
+      <span class="player-name" id="name-top"></span>
+    </div>
+    <div class="board-area">
+      <div class="eval-bar">
+        <div class="eval-label white-advantage" id="eval-label">+0.0</div>
+        <div class="eval-track">
+          <div class="eval-fill" id="eval-fill"></div>
+        </div>
+      </div>
+      <div class="board-wrapper">
+        <div id="board"></div>
+      </div>
+    </div>
+    <div class="player-info" id="player-bottom">
+      <span class="piece-icon" id="icon-bottom"></span>
+      <span class="player-name" id="name-bottom"></span>
+    </div>
+    <div class="nav-buttons">
+      <div class="buttons has-addons">
+        <button class="button is-small" data-action="first" title="First move">|&lt;</button>
+        <button class="button is-small" data-action="prev" title="Previous move">&lt;</button>
+        <button class="button is-small" data-action="next" title="Next move">&gt;</button>
+        <button class="button is-small" data-action="last" title="Last move">&gt;|</button>
+      </div>
+      <span id="move-status" class="has-text-weight-semibold">Move 1/{{len .positions}}</span>
+    </div>
+    <div class="best-move-note" id="best-move-note">Best move: --</div>
+  </div>
+
+  <div>
+    <div class="info-box">
+      <div><strong>Opening:</strong> {{.game.OpeningName}} ({{.game.ECOCode}})</div>
+      <div><strong>Result:</strong> {{.game.Result}} | <strong>Played as:</strong> {{.game.PlayedAs}}</div>
+    </div>
+    <div class="move-list-header">
+      <h2 class="title is-5 mb-0">Moves</h2>
+      <span class="is-size-7 has-text-grey">Click a move or use ← →</span>
+    </div>
+    <div id="move-list" class="move-list"></div>
+  </div>
+</div>
+{{else}}
+<p>Analysis pending or not available.</p>
 {{end}}
 
+{{if .positions}}
+<script>
+(function() {
+  const positions = [
+    {{- range $i, $p := .positions}}{{if $i}},{{end}}
+    {
+      idx: {{$i}},
+      moveNumber: {{.MoveNumber}},
+      fen: "{{.FEN}}",
+      movePlayed: "{{.MovePlayed}}",
+      bestMove: "{{.BestMove}}",
+      evalBefore: {{printf "%.2f" .EvalBefore}},
+      evalAfter: {{printf "%.2f" .EvalAfter}},
+      evalDiff: {{printf "%.2f" .EvalDiff}},
+      classification: "{{.Classification}}"
+    }
+    {{- end}}
+  ];
+
+  const orientation = "{{.game.PlayedAs}}" === "black" ? "black" : "white";
+  const playedAs = "{{.game.PlayedAs}}";
+  const opponent = "{{.game.Opponent}}";
+  const profileUsername = "{{.profile.Username}}";
+  const whitePlayer = playedAs === "white" ? profileUsername : opponent;
+  const blackPlayer = playedAs === "black" ? profileUsername : opponent;
+  const boardEl = document.getElementById("board");
+  const evalFill = document.getElementById("eval-fill");
+  const evalLabel = document.getElementById("eval-label");
+  const moveStatus = document.getElementById("move-status");
+  const bestMoveNote = document.getElementById("best-move-note");
+  const moveListEl = document.getElementById("move-list");
+  let currentIndex = 0;
+  let cg;
+
+  function clampEval(val) {
+    if (val > 10) return 10;
+    if (val < -10) return -10;
+    return val;
+  }
+
+  function updateEvalBar(valPawns) {
+    const clamped = clampEval(valPawns);
+    const percent = ((clamped + 10) / 20) * 100;
+    evalFill.style.height = percent + "%";
+    evalLabel.textContent = (valPawns >= 0 ? "+" : "") + valPawns.toFixed(1);
+    if (valPawns >= 0) {
+      evalLabel.classList.remove("black-advantage");
+      evalLabel.classList.add("white-advantage");
+    } else {
+      evalLabel.classList.remove("white-advantage");
+      evalLabel.classList.add("black-advantage");
+    }
+  }
+
+  function classForTag(cls) {
+    switch ((cls || "").toLowerCase()) {
+      case "blunder": return "is-blunder";
+      case "mistake": return "is-mistake";
+      case "inaccuracy": return "is-inaccuracy";
+      case "good":
+      case "best": return "is-good";
+      default: return "";
+    }
+  }
+
+  function inferMoveColor(fen) {
+    const parts = fen.split(" ");
+    if (parts.length < 2) return "white";
+    // FEN stores side to move. The move that was just played is the opposite color.
+    return parts[1] === "w" ? "black" : "white";
+  }
+
+  function buildMoveRows() {
+    const rows = new Map();
+    positions.forEach((p, idx) => {
+      const color = inferMoveColor(p.fen);
+      const key = p.moveNumber;
+      if (!rows.has(key)) rows.set(key, { moveNumber: p.moveNumber });
+      const row = rows.get(key);
+      row[color] = { ...p, idx };
+    });
+
+    const fragments = [];
+    Array.from(rows.values()).forEach(row => {
+      const white = row.white;
+      const black = row.black;
+      fragments.push(`
+        <div class="move-row">
+          <div class="move-num">${row.moveNumber}.</div>
+          <div class="move-cell ${white ? "" : "has-background-light"} ${white ? classForTag(white.classification) + " tag-wrapper" : ""}" data-idx="${white ? white.idx : ""}">
+            ${white ? `
+              <span>${white.movePlayed || "--"}</span>
+              <span class="tags"><span class="tag ${classForTag(white.classification)}">${(white.classification || "").charAt(0).toUpperCase() + (white.classification || "").slice(1)}</span></span>
+            ` : `<span class="has-text-grey">--</span>`}
+          </div>
+          <div class="move-cell ${black ? "" : "has-background-light"} ${black ? classForTag(black.classification) + " tag-wrapper" : ""}" data-idx="${black ? black.idx : ""}">
+            ${black ? `
+              <span>${black.movePlayed || "--"}</span>
+              <span class="tags"><span class="tag ${classForTag(black.classification)}">${(black.classification || "").charAt(0).toUpperCase() + (black.classification || "").slice(1)}</span></span>
+            ` : `<span class="has-text-grey">--</span>`}
+          </div>
+        </div>
+      `);
+    });
+    moveListEl.innerHTML = fragments.join("");
+    moveListEl.querySelectorAll(".move-cell[data-idx]").forEach(el => {
+      el.addEventListener("click", () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        if (!isNaN(idx)) goToIndex(idx);
+      });
+    });
+  }
+
+  function highlightCurrent() {
+    moveListEl.querySelectorAll(".move-cell").forEach(el => el.classList.remove("active"));
+    const active = moveListEl.querySelector(`.move-cell[data-idx="${currentIndex}"]`);
+    if (active) {
+      active.classList.add("active");
+      active.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }
+
+  function drawBestMoveArrow(bestMove) {
+    if (!bestMove || bestMove.length < 4) {
+      cg.setShapes([]);
+      return;
+    }
+    const from = bestMove.substring(0, 2);
+    const to = bestMove.substring(2, 4);
+    cg.setShapes([{ orig: from, dest: to, brush: "green" }]);
+  }
+
+  function goToIndex(idx) {
+    if (idx < 0 || idx >= positions.length) return;
+    currentIndex = idx;
+    const pos = positions[idx];
+    const evalPawns = pos.evalAfter / 100;
+    cg.set({ fen: pos.fen, orientation });
+    updateEvalBar(evalPawns);
+    drawBestMoveArrow(pos.bestMove);
+    bestMoveNote.textContent = "Best move: " + (pos.bestMove || "--");
+    moveStatus.textContent = "Move " + (idx + 1) + "/" + positions.length;
+    highlightCurrent();
+    updateNavButtons();
+  }
+
+  function updateNavButtons() {
+    const first = document.querySelector('[data-action="first"]');
+    const prev = document.querySelector('[data-action="prev"]');
+    const next = document.querySelector('[data-action="next"]');
+    const last = document.querySelector('[data-action="last"]');
+    const atStart = currentIndex <= 0;
+    const atEnd = currentIndex >= positions.length - 1;
+    first.disabled = atStart;
+    prev.disabled = atStart;
+    next.disabled = atEnd;
+    last.disabled = atEnd;
+  }
+
+  function setupNav() {
+    const actions = {
+      first: () => goToIndex(0),
+      prev: () => goToIndex(currentIndex - 1),
+      next: () => goToIndex(currentIndex + 1),
+      last: () => goToIndex(positions.length - 1),
+    };
+    document.querySelectorAll("[data-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const act = btn.dataset.action;
+        if (actions[act]) actions[act]();
+      });
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); actions.prev(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); actions.next(); }
+    });
+  }
+
+  function initBoard() {
+    const ChessgroundLib = window.Chessground || (typeof Chessground !== "undefined" ? Chessground : null);
+    if (!ChessgroundLib) {
+      console.error("Chessground not loaded");
+      return;
+    }
+    const startFen = positions.length ? positions[0].fen : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    cg = ChessgroundLib(boardEl, {
+      fen: startFen,
+      orientation,
+      draggable: { enabled: false },
+      movable: { enabled: false },
+      animation: { enabled: true }
+    });
+  }
+
+  function setupPlayerNames() {
+    const nameTop = document.getElementById("name-top");
+    const nameBottom = document.getElementById("name-bottom");
+    const iconTop = document.getElementById("icon-top");
+    const iconBottom = document.getElementById("icon-bottom");
+    
+    if (orientation === "white") {
+      // White at bottom, black at top
+      nameBottom.textContent = whitePlayer;
+      nameTop.textContent = blackPlayer;
+      iconBottom.classList.add("white");
+      iconTop.classList.add("black");
+    } else {
+      // Black at bottom, white at top
+      nameBottom.textContent = blackPlayer;
+      nameTop.textContent = whitePlayer;
+      iconBottom.classList.add("black");
+      iconTop.classList.add("white");
+    }
+  }
+
+  function startAnalysis() {
+    buildMoveRows();
+    initBoard();
+    setupNav();
+    setupPlayerNames();
+    goToIndex(0);
+  }
+
+  if (window.addEventListener) {
+    window.addEventListener('load', startAnalysis);
+  } else if (window.attachEvent) {
+    window.attachEvent('onload', startAnalysis);
+  } else {
+    setTimeout(startAnalysis, 500);
+  }
+})();
+</script>
+{{end}}
+
+{{template "foot" .}}
+{{end}}

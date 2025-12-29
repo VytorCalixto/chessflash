@@ -3,6 +3,7 @@ package api
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -194,6 +195,70 @@ func (s *Server) handleResumeAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("queued %d games for analysis resume", len(games))
 	http.Redirect(w, r, "/games", http.StatusSeeOther)
+}
+
+func (s *Server) handleQueueGameAnalysis(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		log.Warn("invalid game ID for queue: %s", idStr)
+		http.Error(w, "invalid game ID", http.StatusBadRequest)
+		return
+	}
+
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context, redirecting to /profiles")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	ctx := r.Context()
+	game, err := s.DB.GetGame(ctx, id)
+	if err != nil || game == nil {
+		log.Warn("game not found for queue: %s", idStr)
+		http.Error(w, "game not found", http.StatusNotFound)
+		return
+	}
+	if game.ProfileID != profile.ID {
+		log.Warn("game does not belong to current profile during queue")
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Preserve query parameters from referer
+	redirectURL := "/games"
+	if referer := r.Header.Get("Referer"); referer != "" {
+		if parsedURL, err := url.Parse(referer); err == nil && parsedURL.Path == "/games" {
+			if parsedURL.RawQuery != "" {
+				redirectURL = "/games?" + parsedURL.RawQuery
+			}
+		}
+	}
+
+	if game.AnalysisStatus == "processing" || game.AnalysisStatus == "completed" {
+		log.Info("game already %s, skipping queue", game.AnalysisStatus)
+		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		return
+	}
+
+	log = log.WithFields(map[string]any{
+		"game_id":   game.ID,
+		"opponent":  game.Opponent,
+		"status":    game.AnalysisStatus,
+		"timeclass": game.TimeClass,
+	})
+	log.Info("queueing single game for analysis")
+
+	s.AnalysisPool.Submit(&worker.AnalyzeGameJob{
+		DB:             s.DB,
+		GameID:         game.ID,
+		StockfishPath:  s.StockfishPath,
+		StockfishDepth: s.StockfishDepth,
+	})
+
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
