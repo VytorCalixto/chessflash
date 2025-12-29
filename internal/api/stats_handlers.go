@@ -4,10 +4,37 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/logger"
 )
+
+// calculateDateCutoff returns the cutoff date based on period string
+// Returns nil for "all_time" or empty string to indicate no date filtering
+func calculateDateCutoff(period string) *time.Time {
+	if period == "" || period == "all_time" {
+		return nil
+	}
+
+	now := time.Now()
+	var cutoff time.Time
+
+	switch period {
+	case "1_month":
+		cutoff = now.AddDate(0, -1, 0)
+	case "3_months":
+		cutoff = now.AddDate(0, -3, 0)
+	case "6_months":
+		cutoff = now.AddDate(0, -6, 0)
+	case "12_months":
+		cutoff = now.AddDate(0, -12, 0)
+	default:
+		return nil
+	}
+
+	return &cutoff
+}
 
 func (s *Server) handleOpenings(w http.ResponseWriter, r *http.Request) {
 	log := logger.FromContext(r.Context())
@@ -160,45 +187,59 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	log = log.WithField("username", profile.Username)
 	log.Debug("fetching aggregate stats")
 
-	summaryStats, err := s.StatsService.GetSummaryStats(r.Context(), profile.ID)
+	// Get filter parameters
+	timeClass := r.URL.Query().Get("time_class")
+	period := r.URL.Query().Get("period")
+	dateCutoff := calculateDateCutoff(period)
+
+	summaryStats, err := s.StatsService.GetSummaryStats(r.Context(), profile.ID, timeClass, dateCutoff)
 	if err != nil {
 		log.Warn("failed to get summary stats, continuing without them: %v", err)
 		summaryStats = nil
 	}
-	timeStats, err := s.StatsService.GetTimeClassStats(r.Context(), profile.ID)
+	timeStats, err := s.StatsService.GetTimeClassStats(r.Context(), profile.ID, dateCutoff)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
-	colorStats, err := s.StatsService.GetColorStats(r.Context(), profile.ID)
+	colorStats, err := s.StatsService.GetColorStats(r.Context(), profile.ID, timeClass, dateCutoff)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
-	monthlyStats, err := s.StatsService.GetMonthlyStats(r.Context(), profile.ID)
+	monthlyStats, err := s.StatsService.GetMonthlyStats(r.Context(), profile.ID, timeClass, dateCutoff)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
-	mistakeStats, err := s.StatsService.GetMistakePhaseStats(r.Context(), profile.ID)
+	mistakeStats, err := s.StatsService.GetMistakePhaseStats(r.Context(), profile.ID, timeClass, dateCutoff)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
-	ratingStats, err := s.StatsService.GetRatingStats(r.Context(), profile.ID)
+	ratingStats, err := s.StatsService.GetRatingStats(r.Context(), profile.ID, timeClass, dateCutoff)
 	if err != nil {
 		handleError(w, r, err)
 		return
 	}
 
+	// Get available time classes for dropdown
+	availableTimeClasses := []string{}
+	for _, ts := range timeStats {
+		availableTimeClasses = append(availableTimeClasses, ts.TimeClass)
+	}
+
 	s.render(w, r, "pages/stats.html", pageData{
-		"summary_stats": summaryStats,
-		"time_stats":    timeStats,
-		"color_stats":   colorStats,
-		"monthly_stats": monthlyStats,
-		"mistake_stats": mistakeStats,
-		"rating_stats":  ratingStats,
-		"profile":       profile,
+		"summary_stats":         summaryStats,
+		"time_stats":            timeStats,
+		"color_stats":           colorStats,
+		"monthly_stats":         monthlyStats,
+		"mistake_stats":         mistakeStats,
+		"rating_stats":          ratingStats,
+		"profile":               profile,
+		"time_class":            timeClass,
+		"period":                period,
+		"available_time_classes": availableTimeClasses,
 	})
 }
 

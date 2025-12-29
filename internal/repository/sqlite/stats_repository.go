@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
@@ -117,16 +118,50 @@ WHERE profile_id = ?
 	return count, nil
 }
 
-func (r *statsRepository) TimeClassStats(ctx context.Context, profileID int64) ([]models.TimeClassStat, error) {
+func (r *statsRepository) TimeClassStats(ctx context.Context, profileID int64, dateCutoff *time.Time) ([]models.TimeClassStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching time class stats: profile_id=%d", profileID)
+	log.Debug("fetching time class stats: profile_id=%d, date_cutoff=%v", profileID, dateCutoff)
 
-	rows, err := r.db.QueryContext(ctx, `
+	var rows *sql.Rows
+	var err error
+
+	// If date filtering, query from games directly
+	if dateCutoff != nil {
+		rows, err = r.db.QueryContext(ctx, `
+SELECT g.time_class,
+       COUNT(*) AS total_games,
+       SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) AS wins,
+       SUM(CASE WHEN g.result = 'draw' THEN 1 ELSE 0 END) AS draws,
+       SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) AS losses,
+       ROUND(100.0 * SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1) AS win_rate,
+       COALESCE(AVG(COALESCE(b.blunder_count, 0)), 0) AS avg_blunders,
+       COALESCE(AVG(COALESCE(m.moves_played, 0)), 0) AS avg_game_length
+FROM games g
+LEFT JOIN (
+    SELECT game_id, COUNT(*) AS blunder_count
+    FROM positions
+    WHERE classification = 'blunder'
+    GROUP BY game_id
+) b ON b.game_id = g.id
+LEFT JOIN (
+    SELECT game_id, MAX(move_number) AS moves_played
+    FROM positions
+    GROUP BY game_id
+) m ON m.game_id = g.id
+WHERE g.profile_id = ? AND g.played_at >= ?
+GROUP BY g.time_class
+ORDER BY total_games DESC
+`, profileID, dateCutoff)
+	} else {
+		// Use cache when not filtering
+		rows, err = r.db.QueryContext(ctx, `
 SELECT time_class, total_games, wins, draws, losses, win_rate, avg_blunders, avg_game_length
 FROM time_class_stats_cache
 WHERE profile_id = ?
 ORDER BY total_games DESC
 `, profileID)
+	}
+
 	if err != nil {
 		log.Error("failed to query time class stats: %v", err)
 		return nil, err
@@ -144,16 +179,55 @@ ORDER BY total_games DESC
 	return stats, rows.Err()
 }
 
-func (r *statsRepository) ColorStats(ctx context.Context, profileID int64) ([]models.ColorStat, error) {
+func (r *statsRepository) ColorStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.ColorStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching color stats: profile_id=%d", profileID)
+	log.Debug("fetching color stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	rows, err := r.db.QueryContext(ctx, `
+	var rows *sql.Rows
+	var err error
+
+	// If filtering, query from games directly
+	if timeClass != "" || dateCutoff != nil {
+		query := `
+SELECT g.played_as,
+       COUNT(*) AS total_games,
+       SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) AS wins,
+       SUM(CASE WHEN g.result = 'draw' THEN 1 ELSE 0 END) AS draws,
+       SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) AS losses,
+       ROUND(100.0 * SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1) AS win_rate,
+       COALESCE(AVG(COALESCE(b.blunder_count, 0)), 0) AS avg_blunders
+FROM games g
+LEFT JOIN (
+    SELECT game_id, COUNT(*) AS blunder_count
+    FROM positions
+    WHERE classification = 'blunder'
+    GROUP BY game_id
+) b ON b.game_id = g.id
+WHERE g.profile_id = ?`
+		args := []any{profileID}
+
+		if timeClass != "" {
+			query += " AND g.time_class = ?"
+			args = append(args, timeClass)
+		}
+		if dateCutoff != nil {
+			query += " AND g.played_at >= ?"
+			args = append(args, dateCutoff)
+		}
+
+		query += " GROUP BY g.played_as ORDER BY total_games DESC"
+
+		rows, err = r.db.QueryContext(ctx, query, args...)
+	} else {
+		// Use cache when not filtering
+		rows, err = r.db.QueryContext(ctx, `
 SELECT played_as, total_games, wins, draws, losses, win_rate, avg_blunders
 FROM color_stats_cache
 WHERE profile_id = ?
 ORDER BY total_games DESC
 `, profileID)
+	}
+
 	if err != nil {
 		log.Error("failed to query color stats: %v", err)
 		return nil, err
@@ -171,16 +245,57 @@ ORDER BY total_games DESC
 	return stats, rows.Err()
 }
 
-func (r *statsRepository) MonthlyStats(ctx context.Context, profileID int64) ([]models.MonthlyStat, error) {
+func (r *statsRepository) MonthlyStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MonthlyStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching monthly stats: profile_id=%d", profileID)
+	log.Debug("fetching monthly stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	rows, err := r.db.QueryContext(ctx, `
+	var rows *sql.Rows
+	var err error
+
+	// If filtering, query from games directly
+	if timeClass != "" || dateCutoff != nil {
+		query := `
+SELECT strftime('%Y-%m', g.played_at) AS year_month,
+       COUNT(*) AS total_games,
+       SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) AS wins,
+       SUM(CASE WHEN g.result = 'draw' THEN 1 ELSE 0 END) AS draws,
+       SUM(CASE WHEN g.result = 'loss' THEN 1 ELSE 0 END) AS losses,
+       ROUND(100.0 * SUM(CASE WHEN g.result = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1) AS win_rate,
+       COALESCE(SUM(COALESCE(b.blunder_count, 0)), 0) AS total_blunders,
+       CASE WHEN COUNT(*) > 0 THEN ROUND(1.0 * COALESCE(SUM(COALESCE(b.blunder_count, 0)), 0) / COUNT(*), 3) ELSE 0 END AS blunder_rate,
+       AVG(g.player_rating) AS avg_rating
+FROM games g
+LEFT JOIN (
+    SELECT game_id, COUNT(*) AS blunder_count
+    FROM positions
+    WHERE classification = 'blunder'
+    GROUP BY game_id
+) b ON b.game_id = g.id
+WHERE g.profile_id = ?`
+		args := []any{profileID}
+
+		if timeClass != "" {
+			query += " AND g.time_class = ?"
+			args = append(args, timeClass)
+		}
+		if dateCutoff != nil {
+			query += " AND g.played_at >= ?"
+			args = append(args, dateCutoff)
+		}
+
+		query += " GROUP BY year_month ORDER BY year_month DESC"
+
+		rows, err = r.db.QueryContext(ctx, query, args...)
+	} else {
+		// Use cache when not filtering
+		rows, err = r.db.QueryContext(ctx, `
 SELECT year_month, total_games, wins, draws, losses, win_rate, total_blunders, blunder_rate, avg_rating
 FROM monthly_stats_cache
 WHERE profile_id = ?
 ORDER BY year_month DESC
 `, profileID)
+	}
+
 	if err != nil {
 		log.Error("failed to query monthly stats: %v", err)
 		return nil, err
@@ -198,16 +313,51 @@ ORDER BY year_month DESC
 	return stats, rows.Err()
 }
 
-func (r *statsRepository) MistakePhaseStats(ctx context.Context, profileID int64) ([]models.MistakePhaseStat, error) {
+func (r *statsRepository) MistakePhaseStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MistakePhaseStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching mistake phase stats: profile_id=%d", profileID)
+	log.Debug("fetching mistake phase stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	rows, err := r.db.QueryContext(ctx, `
+	var rows *sql.Rows
+	var err error
+
+	// If filtering, query from positions/games directly
+	if timeClass != "" || dateCutoff != nil {
+		query := `
+SELECT CASE
+           WHEN p.move_number <= 15 THEN 'opening'
+           WHEN p.move_number <= 35 THEN 'middlegame'
+           ELSE 'endgame'
+       END AS phase,
+       p.classification,
+       COUNT(*) AS count,
+       AVG(CASE WHEN p.eval_diff < 0 THEN -p.eval_diff ELSE 0 END) AS avg_eval_loss
+FROM positions p
+JOIN games g ON g.id = p.game_id
+WHERE g.profile_id = ?`
+		args := []any{profileID}
+
+		if timeClass != "" {
+			query += " AND g.time_class = ?"
+			args = append(args, timeClass)
+		}
+		if dateCutoff != nil {
+			query += " AND g.played_at >= ?"
+			args = append(args, dateCutoff)
+		}
+
+		query += " GROUP BY phase, p.classification ORDER BY phase, p.classification"
+
+		rows, err = r.db.QueryContext(ctx, query, args...)
+	} else {
+		// Use cache when not filtering
+		rows, err = r.db.QueryContext(ctx, `
 SELECT phase, classification, count, avg_eval_loss
 FROM mistake_phase_cache
 WHERE profile_id = ?
 ORDER BY phase, classification
 `, profileID)
+	}
+
 	if err != nil {
 		log.Error("failed to query mistake phase stats: %v", err)
 		return nil, err
@@ -225,16 +375,104 @@ ORDER BY phase, classification
 	return stats, rows.Err()
 }
 
-func (r *statsRepository) RatingStats(ctx context.Context, profileID int64) ([]models.RatingStat, error) {
+func (r *statsRepository) RatingStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.RatingStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching rating stats: profile_id=%d", profileID)
+	log.Debug("fetching rating stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	rows, err := r.db.QueryContext(ctx, `
+	var rows *sql.Rows
+	var err error
+
+	// If filtering, query from games directly with complex subqueries
+	if timeClass != "" || dateCutoff != nil {
+		// Build WHERE clause for main query
+		whereClause := "WHERE g.profile_id = ? AND g.player_rating IS NOT NULL"
+		args := []any{profileID}
+
+		if timeClass != "" {
+			whereClause += " AND g.time_class = ?"
+			args = append(args, timeClass)
+		}
+		if dateCutoff != nil {
+			whereClause += " AND g.played_at >= ?"
+			args = append(args, dateCutoff)
+		}
+
+		// Build WHERE clause for subqueries (they reference outer query's time_class)
+		subWhereClause := "WHERE g2.profile_id = ? AND g2.time_class = g.time_class AND g2.player_rating IS NOT NULL"
+		if dateCutoff != nil {
+			subWhereClause += " AND g2.played_at >= ?"
+		}
+
+		subWhereClauseAsc := "WHERE g3.profile_id = ? AND g3.time_class = g.time_class AND g3.player_rating IS NOT NULL"
+		if dateCutoff != nil {
+			subWhereClauseAsc += " AND g3.played_at >= ?"
+		}
+
+		query := `
+SELECT g.time_class,
+       MIN(g.player_rating) AS min_rating,
+       MAX(g.player_rating) AS max_rating,
+       AVG(g.player_rating) AS avg_rating,
+       (
+           SELECT g2.player_rating
+           FROM games g2
+           ` + subWhereClause + `
+           ORDER BY g2.played_at DESC
+           LIMIT 1
+       ) AS current_rating,
+       (
+           COALESCE((
+               SELECT g2.player_rating
+               FROM games g2
+               ` + subWhereClause + `
+               ORDER BY g2.played_at DESC
+               LIMIT 1
+           ), 0) -
+           COALESCE((
+               SELECT g3.player_rating
+               FROM games g3
+               ` + subWhereClauseAsc + `
+               ORDER BY g3.played_at ASC
+               LIMIT 1
+           ), 0)
+       ) AS rating_change,
+       COUNT(g.player_rating) AS games_tracked
+FROM games g
+` + whereClause + `
+GROUP BY g.time_class
+ORDER BY g.time_class`
+
+		// Build args array - subqueries need profileID and optionally dateCutoff
+		// SQLite will use the outer query's g.time_class, so we don't need to pass it
+		finalArgs := make([]any, 0)
+		finalArgs = append(finalArgs, args...) // Main query args
+		// Subquery 1 args (for current_rating)
+		finalArgs = append(finalArgs, profileID)
+		if dateCutoff != nil {
+			finalArgs = append(finalArgs, dateCutoff)
+		}
+		// Subquery 2 args (for rating_change - first subquery)
+		finalArgs = append(finalArgs, profileID)
+		if dateCutoff != nil {
+			finalArgs = append(finalArgs, dateCutoff)
+		}
+		// Subquery 3 args (for rating_change - second subquery)
+		finalArgs = append(finalArgs, profileID)
+		if dateCutoff != nil {
+			finalArgs = append(finalArgs, dateCutoff)
+		}
+
+		rows, err = r.db.QueryContext(ctx, query, finalArgs...)
+	} else {
+		// Use cache when not filtering
+		rows, err = r.db.QueryContext(ctx, `
 SELECT time_class, min_rating, max_rating, avg_rating, current_rating, rating_change, games_tracked
 FROM rating_stats_cache
 WHERE profile_id = ?
 ORDER BY time_class
 `, profileID)
+	}
+
 	if err != nil {
 		log.Error("failed to query rating stats: %v", err)
 		return nil, err
@@ -511,14 +749,86 @@ GROUP BY rh.quality
 	}, rows.Err()
 }
 
-func (r *statsRepository) SummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error) {
+func (r *statsRepository) SummaryStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) (*models.SummaryStat, error) {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
-	log.Debug("fetching summary stats: profile_id=%d", profileID)
+	log.Debug("fetching summary stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
 	var stat models.SummaryStat
-	
-	// Get total games and overall win rate from time class stats
-	err := r.db.QueryRowContext(ctx, `
+
+	// If filtering, query from games table directly
+	if dateCutoff != nil || timeClass != "" {
+		gameQuery := `
+SELECT 
+    COUNT(*) AS total_games,
+    CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND(100.0 * SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) / COUNT(*), 1)
+        ELSE 0 
+    END AS overall_win_rate
+FROM games
+WHERE profile_id = ?`
+		gameArgs := []any{profileID}
+
+		if timeClass != "" {
+			gameQuery += " AND time_class = ?"
+			gameArgs = append(gameArgs, timeClass)
+		}
+		if dateCutoff != nil {
+			gameQuery += " AND played_at >= ?"
+			gameArgs = append(gameArgs, dateCutoff)
+		}
+
+		err := r.db.QueryRowContext(ctx, gameQuery, gameArgs...).Scan(&stat.TotalGames, &stat.OverallWinRate)
+		if err != nil {
+			log.Error("failed to get games/wins with filters: %v", err)
+			return nil, err
+		}
+
+		// Get current highest rating from games
+		ratingQuery := `
+SELECT COALESCE(MAX(player_rating), 0)
+FROM games
+WHERE profile_id = ? AND player_rating IS NOT NULL`
+		ratingArgs := []any{profileID}
+		if timeClass != "" {
+			ratingQuery += " AND time_class = ?"
+			ratingArgs = append(ratingArgs, timeClass)
+		}
+		if dateCutoff != nil {
+			ratingQuery += " AND played_at >= ?"
+			ratingArgs = append(ratingArgs, dateCutoff)
+		}
+
+		err = r.db.QueryRowContext(ctx, ratingQuery, ratingArgs...).Scan(&stat.CurrentRating)
+		if err != nil {
+			log.Error("failed to get current rating with filters: %v", err)
+			return nil, err
+		}
+
+		// Get total blunders from positions
+		blunderQuery := `
+SELECT COALESCE(COUNT(*), 0)
+FROM positions p
+JOIN games g ON g.id = p.game_id
+WHERE g.profile_id = ? AND p.classification = 'blunder'`
+		blunderArgs := []any{profileID}
+		if timeClass != "" {
+			blunderQuery += " AND g.time_class = ?"
+			blunderArgs = append(blunderArgs, timeClass)
+		}
+		if dateCutoff != nil {
+			blunderQuery += " AND g.played_at >= ?"
+			blunderArgs = append(blunderArgs, dateCutoff)
+		}
+
+		err = r.db.QueryRowContext(ctx, blunderQuery, blunderArgs...).Scan(&stat.TotalBlunders)
+		if err != nil {
+			log.Error("failed to get total blunders with filters: %v", err)
+			return nil, err
+		}
+	} else {
+		// Use cache when not filtering
+		err := r.db.QueryRowContext(ctx, `
 SELECT 
     COALESCE(SUM(total_games), 0) AS total_games,
     CASE 
@@ -529,31 +839,30 @@ SELECT
 FROM time_class_stats_cache
 WHERE profile_id = ?
 `, profileID).Scan(&stat.TotalGames, &stat.OverallWinRate)
-	if err != nil {
-		log.Error("failed to get games/wins from summary stats: %v", err)
-		return nil, err
-	}
+		if err != nil {
+			log.Error("failed to get games/wins from summary stats: %v", err)
+			return nil, err
+		}
 
-	// Get current highest rating from rating stats
-	err = r.db.QueryRowContext(ctx, `
+		err = r.db.QueryRowContext(ctx, `
 SELECT COALESCE(MAX(current_rating), 0)
 FROM rating_stats_cache
 WHERE profile_id = ?
 `, profileID).Scan(&stat.CurrentRating)
-	if err != nil {
-		log.Error("failed to get current rating from summary stats: %v", err)
-		return nil, err
-	}
+		if err != nil {
+			log.Error("failed to get current rating from summary stats: %v", err)
+			return nil, err
+		}
 
-	// Get total blunders from monthly stats
-	err = r.db.QueryRowContext(ctx, `
+		err = r.db.QueryRowContext(ctx, `
 SELECT COALESCE(SUM(total_blunders), 0)
 FROM monthly_stats_cache
 WHERE profile_id = ?
 `, profileID).Scan(&stat.TotalBlunders)
-	if err != nil {
-		log.Error("failed to get total blunders from summary stats: %v", err)
-		return nil, err
+		if err != nil {
+			log.Error("failed to get total blunders from summary stats: %v", err)
+			return nil, err
+		}
 	}
 
 	// Calculate average blunders per game

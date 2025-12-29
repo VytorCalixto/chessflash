@@ -25,6 +25,65 @@
 </div>
 <p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
 
+<!-- Filter Section -->
+<div class="level mt-4">
+  <div class="level-left">
+    <div class="level-item">
+      <div class="field">
+        <label class="label">Filter by Time Control</label>
+        <div class="control">
+          <div class="select">
+            <select id="timeClassFilter" onchange="applyFilters()">
+              <option value="">All Time Controls</option>
+              {{range .available_time_classes}}
+              <option value="{{.}}" {{if eq $.time_class .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="level-item">
+      <div class="field">
+        <label class="label">Filter by Time Period</label>
+        <div class="control">
+          <div class="select">
+            <select id="periodFilter" onchange="applyFilters()">
+              <option value="all_time" {{if or (not .period) (eq .period "all_time")}}selected{{end}}>All Time</option>
+              <option value="1_month" {{if eq .period "1_month"}}selected{{end}}>Last Month</option>
+              <option value="3_months" {{if eq .period "3_months"}}selected{{end}}>Last 3 Months</option>
+              <option value="6_months" {{if eq .period "6_months"}}selected{{end}}>Last 6 Months</option>
+              <option value="12_months" {{if eq .period "12_months"}}selected{{end}}>Last 12 Months</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function applyFilters() {
+  const timeClass = document.getElementById('timeClassFilter').value;
+  const period = document.getElementById('periodFilter').value;
+  const url = new URL(window.location);
+  
+  if (timeClass) {
+    url.searchParams.set('time_class', timeClass);
+  } else {
+    url.searchParams.delete('time_class');
+  }
+  
+  if (period && period !== 'all_time') {
+    url.searchParams.set('period', period);
+  } else {
+    url.searchParams.delete('period');
+  }
+  
+  window.location.href = url.toString();
+}
+</script>
+
 {{if .summary_stats}}
 <!-- Summary Dashboard Cards -->
 <div class="columns is-multiline mt-4">

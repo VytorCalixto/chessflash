@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"time"
 
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/logger"
@@ -13,12 +14,12 @@ import (
 type StatsService interface {
 	GetOpeningStats(ctx context.Context, profileID int64, limit, offset int) ([]models.OpeningStat, int, error)
 	GetOpponentStats(ctx context.Context, profileID int64, limit, offset int, orderBy, orderDir string) ([]models.OpponentStat, int, error)
-	GetTimeClassStats(ctx context.Context, profileID int64) ([]models.TimeClassStat, error)
-	GetColorStats(ctx context.Context, profileID int64) ([]models.ColorStat, error)
-	GetMonthlyStats(ctx context.Context, profileID int64) ([]models.MonthlyStat, error)
-	GetMistakePhaseStats(ctx context.Context, profileID int64) ([]models.MistakePhaseStat, error)
-	GetRatingStats(ctx context.Context, profileID int64) ([]models.RatingStat, error)
-	GetSummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error)
+	GetTimeClassStats(ctx context.Context, profileID int64, dateCutoff *time.Time) ([]models.TimeClassStat, error)
+	GetColorStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.ColorStat, error)
+	GetMonthlyStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MonthlyStat, error)
+	GetMistakePhaseStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MistakePhaseStat, error)
+	GetRatingStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.RatingStat, error)
+	GetSummaryStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) (*models.SummaryStat, error)
 	GetFlashcardStats(ctx context.Context, profileID int64) (*models.FlashcardStat, error)
 	GetFlashcardClassificationStats(ctx context.Context, profileID int64) ([]models.FlashcardClassificationStat, error)
 	GetFlashcardPhaseStats(ctx context.Context, profileID int64) ([]models.FlashcardPhaseStat, error)
@@ -74,11 +75,11 @@ func (s *statsService) GetOpponentStats(ctx context.Context, profileID int64, li
 	return stats, totalCount, nil
 }
 
-func (s *statsService) GetTimeClassStats(ctx context.Context, profileID int64) ([]models.TimeClassStat, error) {
+func (s *statsService) GetTimeClassStats(ctx context.Context, profileID int64, dateCutoff *time.Time) ([]models.TimeClassStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting time class stats: profile_id=%d", profileID)
+	log.Debug("getting time class stats: profile_id=%d, date_cutoff=%v", profileID, dateCutoff)
 
-	stats, err := s.statsRepo.TimeClassStats(ctx, profileID)
+	stats, err := s.statsRepo.TimeClassStats(ctx, profileID, dateCutoff)
 	if err != nil {
 		log.Error("failed to get time class stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -87,11 +88,11 @@ func (s *statsService) GetTimeClassStats(ctx context.Context, profileID int64) (
 	return stats, nil
 }
 
-func (s *statsService) GetColorStats(ctx context.Context, profileID int64) ([]models.ColorStat, error) {
+func (s *statsService) GetColorStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.ColorStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting color stats: profile_id=%d", profileID)
+	log.Debug("getting color stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	stats, err := s.statsRepo.ColorStats(ctx, profileID)
+	stats, err := s.statsRepo.ColorStats(ctx, profileID, timeClass, dateCutoff)
 	if err != nil {
 		log.Error("failed to get color stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -100,11 +101,11 @@ func (s *statsService) GetColorStats(ctx context.Context, profileID int64) ([]mo
 	return stats, nil
 }
 
-func (s *statsService) GetMonthlyStats(ctx context.Context, profileID int64) ([]models.MonthlyStat, error) {
+func (s *statsService) GetMonthlyStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MonthlyStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting monthly stats: profile_id=%d", profileID)
+	log.Debug("getting monthly stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	stats, err := s.statsRepo.MonthlyStats(ctx, profileID)
+	stats, err := s.statsRepo.MonthlyStats(ctx, profileID, timeClass, dateCutoff)
 	if err != nil {
 		log.Error("failed to get monthly stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -113,11 +114,11 @@ func (s *statsService) GetMonthlyStats(ctx context.Context, profileID int64) ([]
 	return stats, nil
 }
 
-func (s *statsService) GetMistakePhaseStats(ctx context.Context, profileID int64) ([]models.MistakePhaseStat, error) {
+func (s *statsService) GetMistakePhaseStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.MistakePhaseStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting mistake phase stats: profile_id=%d", profileID)
+	log.Debug("getting mistake phase stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	stats, err := s.statsRepo.MistakePhaseStats(ctx, profileID)
+	stats, err := s.statsRepo.MistakePhaseStats(ctx, profileID, timeClass, dateCutoff)
 	if err != nil {
 		log.Error("failed to get mistake phase stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -126,11 +127,11 @@ func (s *statsService) GetMistakePhaseStats(ctx context.Context, profileID int64
 	return stats, nil
 }
 
-func (s *statsService) GetRatingStats(ctx context.Context, profileID int64) ([]models.RatingStat, error) {
+func (s *statsService) GetRatingStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) ([]models.RatingStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting rating stats: profile_id=%d", profileID)
+	log.Debug("getting rating stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	stats, err := s.statsRepo.RatingStats(ctx, profileID)
+	stats, err := s.statsRepo.RatingStats(ctx, profileID, timeClass, dateCutoff)
 	if err != nil {
 		log.Error("failed to get rating stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -139,11 +140,11 @@ func (s *statsService) GetRatingStats(ctx context.Context, profileID int64) ([]m
 	return stats, nil
 }
 
-func (s *statsService) GetSummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error) {
+func (s *statsService) GetSummaryStats(ctx context.Context, profileID int64, timeClass string, dateCutoff *time.Time) (*models.SummaryStat, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("getting summary stats: profile_id=%d", profileID)
+	log.Debug("getting summary stats: profile_id=%d, time_class=%s, date_cutoff=%v", profileID, timeClass, dateCutoff)
 
-	stats, err := s.statsRepo.SummaryStats(ctx, profileID)
+	stats, err := s.statsRepo.SummaryStats(ctx, profileID, timeClass, dateCutoff)
 	if err != nil {
 		log.Error("failed to get summary stats: %v", err)
 		return nil, errors.NewInternalError(err)
