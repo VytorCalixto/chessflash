@@ -260,6 +260,7 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 			MateBefore:     mateBefore,
 			MateAfter:      mateAfter,
 			Classification: classification,
+			CreatedAt:      time.Now(), // Set timestamp when position is evaluated
 		}
 		positionsToInsert = append(positionsToInsert, position)
 

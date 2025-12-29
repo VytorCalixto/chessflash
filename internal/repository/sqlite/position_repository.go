@@ -24,9 +24,9 @@ func (r *positionRepository) Insert(ctx context.Context, p models.Position) (int
 		p.GameID, p.MoveNumber, p.Classification)
 
 	res, err := r.db.ExecContext(ctx, `
-INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.MateBefore, p.MateAfter, p.Classification)
+INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.MateBefore, p.MateAfter, p.Classification, p.CreatedAt)
 	if err != nil {
 		log.Error("failed to insert position: %v", err)
 		return 0, err
@@ -51,8 +51,8 @@ func (r *positionRepository) InsertBatch(ctx context.Context, positions []models
 	var insertedIDs []int64
 	err := tx(ctx, r.db, func(tx *sql.Tx) error {
 		stmt, err := tx.PrepareContext(ctx, `
-INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `)
 		if err != nil {
 			log.Error("failed to prepare batch insert: %v", err)
@@ -61,7 +61,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		defer stmt.Close()
 
 		for _, p := range positions {
-			res, err := stmt.ExecContext(ctx, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.MateBefore, p.MateAfter, p.Classification)
+			res, err := stmt.ExecContext(ctx, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.MateBefore, p.MateAfter, p.Classification, p.CreatedAt)
 			if err != nil {
 				log.Error("failed to insert position game_id=%d move_number=%d: %v", p.GameID, p.MoveNumber, err)
 				return err

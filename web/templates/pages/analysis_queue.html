@@ -1,0 +1,419 @@
+{{define "pages/analysis_queue.html"}}
+{{template "head" .}}
+<h1 class="title is-4">Queue Games for Analysis</h1>
+<p class="subtitle is-6">Configure filters to select which games should be analyzed</p>
+
+<form id="analysis-filter-form" method="post" action="/analysis/queue">
+  <!-- Time Control Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Time Control</h2>
+    <div class="field is-grouped is-grouped-multiline">
+      {{range .time_classes}}
+      <div class="control">
+        <label class="checkbox">
+          <input type="checkbox" name="time_class" value="{{.}}" id="time_class_{{.}}">
+          <span class="ml-2">{{.}}</span>
+        </label>
+      </div>
+      {{end}}
+    </div>
+    <p class="help">Leave unchecked to include all time controls</p>
+  </div>
+
+  <!-- Date Range Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Date Range</h2>
+    
+    <!-- Date Presets -->
+    <div class="field is-grouped mb-4">
+      <div class="control">
+        <button type="button" class="button is-small" onclick="setDatePreset('last_week')">Last Week</button>
+      </div>
+      <div class="control">
+        <button type="button" class="button is-small" onclick="setDatePreset('last_month')">Last Month</button>
+      </div>
+      <div class="control">
+        <button type="button" class="button is-small" onclick="setDatePreset('last_3_months')">Last 3 Months</button>
+      </div>
+      <div class="control">
+        <button type="button" class="button is-small" onclick="setDatePreset('last_year')">Last Year</button>
+      </div>
+      <div class="control">
+        <button type="button" class="button is-small" onclick="setDatePreset('all_time')">All Time</button>
+      </div>
+    </div>
+
+    <!-- Custom Date Range -->
+    <div class="columns">
+      <div class="column is-half">
+        <label class="label">Start Date</label>
+        <input class="input" type="date" name="start_date" id="start_date">
+      </div>
+      <div class="column is-half">
+        <label class="label">End Date</label>
+        <input class="input" type="date" name="end_date" id="end_date">
+      </div>
+    </div>
+    <input type="hidden" name="date_preset" id="date_preset" value="">
+    <p class="help">Use presets above or select custom date range. Leave empty to include all dates.</p>
+  </div>
+
+  <!-- Result Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Result</h2>
+    <div class="field">
+      <div class="control">
+        <label class="radio">
+          <input type="radio" name="result" value="" checked>
+          <span class="ml-2">All Results</span>
+        </label>
+      </div>
+      {{range .results}}
+      <div class="control">
+        <label class="radio">
+          <input type="radio" name="result" value="{{.}}">
+          <span class="ml-2">{{.}}</span>
+        </label>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Color Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Color</h2>
+    <div class="field">
+      <div class="control">
+        <label class="radio">
+          <input type="radio" name="played_as" value="" checked>
+          <span class="ml-2">All Colors</span>
+        </label>
+      </div>
+      {{range .colors}}
+      <div class="control">
+        <label class="radio">
+          <input type="radio" name="played_as" value="{{.}}">
+          <span class="ml-2">{{.}}</span>
+        </label>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Rating Range Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Rating Range</h2>
+    <div class="columns">
+      <div class="column is-half">
+        <label class="label">Minimum Rating</label>
+        <input class="input" type="number" name="min_rating" id="min_rating" min="0" placeholder="No minimum">
+      </div>
+      <div class="column is-half">
+        <label class="label">Maximum Rating</label>
+        <input class="input" type="number" name="max_rating" id="max_rating" min="0" placeholder="No maximum">
+      </div>
+    </div>
+    <p class="help">Filter by your rating at the time of the game. Leave empty to include all ratings.</p>
+  </div>
+
+  <!-- Opponent Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Opponent (Optional)</h2>
+    <div class="field">
+      <div class="control">
+        <input class="input" type="text" name="opponent" id="opponent" placeholder="Filter by opponent username">
+      </div>
+    </div>
+  </div>
+
+  <!-- Opening Filter -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Opening (Optional)</h2>
+    <div class="field">
+      <div class="control">
+        <input class="input" type="text" name="opening" id="opening" placeholder="Filter by opening name">
+      </div>
+    </div>
+  </div>
+
+  <!-- Queue Options -->
+  <div class="box mb-4">
+    <h2 class="title is-5 mb-4">Queue Options</h2>
+    <div class="field">
+      <div class="control">
+        <label class="checkbox">
+          <input type="checkbox" name="include_failed" value="true" id="include_failed">
+          <span class="ml-2">Include failed analyses (retry failed games)</span>
+        </label>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Queue Next N Games</label>
+      <div class="control">
+        <input class="input" type="number" name="limit" id="limit" min="0" value="0" placeholder="0 = all matching games">
+      </div>
+      <p class="help">Enter 0 to queue all matching games, or a number to limit how many games to queue. Analysis always starts from the latest games.</p>
+    </div>
+  </div>
+
+  <!-- Live Count Display -->
+  <div class="box mb-4 has-background-info-light">
+    <h2 class="title is-5 mb-2">Games to be Analyzed</h2>
+    <p class="title is-3" id="game-count">-</p>
+    <p class="help">This count updates automatically as you change filters</p>
+  </div>
+
+  <!-- Submit Button -->
+  <div class="field is-grouped">
+    <div class="control">
+      <button type="submit" class="button is-primary is-large">Queue Games for Analysis</button>
+    </div>
+    <div class="control">
+      <a href="/" class="button is-light">Cancel</a>
+    </div>
+  </div>
+</form>
+
+<script>
+// Date preset handler
+function setDatePreset(preset) {
+  const presetInput = document.getElementById('date_preset');
+  const startDateInput = document.getElementById('start_date');
+  const endDateInput = document.getElementById('end_date');
+  
+  presetInput.value = preset;
+  
+  if (preset === 'all_time') {
+    startDateInput.value = '';
+    endDateInput.value = '';
+  } else {
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch(preset) {
+      case 'last_week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'last_month':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case 'last_3_months':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      case 'last_year':
+        startDate.setDate(now.getDate() - 365);
+        break;
+    }
+    
+    if (preset !== 'all_time') {
+      startDateInput.value = startDate.toISOString().split('T')[0];
+      endDateInput.value = now.toISOString().split('T')[0];
+    }
+  }
+  
+  updateCount();
+}
+
+// Update count function
+function updateCount() {
+  const form = document.getElementById('analysis-filter-form');
+  const formData = new FormData(form);
+  const params = new URLSearchParams();
+  
+  // Convert FormData to URLSearchParams
+  for (const [key, value] of formData.entries()) {
+    if (key === 'time_class') {
+      // Handle multiple checkboxes
+      const checkboxes = form.querySelectorAll('input[name="time_class"]:checked');
+      if (checkboxes.length > 0) {
+        checkboxes.forEach(cb => params.append('time_class', cb.value));
+      }
+    } else if (value) {
+      params.append(key, value);
+    }
+  }
+  
+  // Add radio button values
+  const resultRadio = form.querySelector('input[name="result"]:checked');
+  if (resultRadio && resultRadio.value) {
+    params.set('result', resultRadio.value);
+  }
+  
+  const playedAsRadio = form.querySelector('input[name="played_as"]:checked');
+  if (playedAsRadio && playedAsRadio.value) {
+    params.set('played_as', playedAsRadio.value);
+  }
+  
+  // Fetch count
+  fetch('/api/analysis/queue/count?' + params.toString())
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('game-count').textContent = data.count || 0;
+    })
+    .catch(error => {
+      console.error('Failed to fetch count:', error);
+      document.getElementById('game-count').textContent = '-';
+    });
+}
+
+// Debounce function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Debounced update count
+const debouncedUpdateCount = debounce(updateCount, 300);
+
+// Save filters to localStorage
+function saveFiltersToStorage() {
+  const form = document.getElementById('analysis-filter-form');
+  const filters = {};
+  
+  // Get time classes
+  const timeClasses = [];
+  form.querySelectorAll('input[name="time_class"]:checked').forEach(cb => {
+    timeClasses.push(cb.value);
+  });
+  if (timeClasses.length > 0) {
+    filters.time_classes = timeClasses;
+  }
+  
+  // Get result
+  const resultRadio = form.querySelector('input[name="result"]:checked');
+  if (resultRadio && resultRadio.value) {
+    filters.result = resultRadio.value;
+  }
+  
+  // Get played_as
+  const playedAsRadio = form.querySelector('input[name="played_as"]:checked');
+  if (playedAsRadio && playedAsRadio.value) {
+    filters.played_as = playedAsRadio.value;
+  }
+  
+  // Get dates
+  const startDate = document.getElementById('start_date').value;
+  const endDate = document.getElementById('end_date').value;
+  const datePreset = document.getElementById('date_preset').value;
+  if (datePreset) {
+    filters.date_preset = datePreset;
+  } else {
+    if (startDate) filters.start_date = startDate;
+    if (endDate) filters.end_date = endDate;
+  }
+  
+  // Get rating range
+  const minRating = document.getElementById('min_rating').value;
+  const maxRating = document.getElementById('max_rating').value;
+  if (minRating) filters.min_rating = parseInt(minRating);
+  if (maxRating) filters.max_rating = parseInt(maxRating);
+  
+  // Get opponent
+  const opponent = document.getElementById('opponent').value;
+  if (opponent) filters.opponent = opponent;
+  
+  // Get opening
+  const opening = document.getElementById('opening').value;
+  if (opening) filters.opening = opening;
+  
+  // Get queue options
+  const includeFailed = document.getElementById('include_failed').checked;
+  if (includeFailed) filters.include_failed = true;
+  
+  const limit = document.getElementById('limit').value;
+  if (limit && parseInt(limit) > 0) {
+    filters.limit = parseInt(limit);
+  }
+  
+  // Save to localStorage
+  localStorage.setItem('analysisFilters', JSON.stringify(filters));
+}
+
+// Load filters from localStorage
+function loadFiltersFromStorage() {
+  const saved = localStorage.getItem('analysisFilters');
+  if (!saved) return;
+  
+  try {
+    const filters = JSON.parse(saved);
+    const form = document.getElementById('analysis-filter-form');
+    
+    // Restore time classes
+    if (filters.time_classes) {
+      filters.time_classes.forEach(tc => {
+        const checkbox = document.getElementById('time_class_' + tc);
+        if (checkbox) checkbox.checked = true;
+      });
+    }
+    
+    // Restore result
+    if (filters.result) {
+      const radio = form.querySelector('input[name="result"][value="' + filters.result + '"]');
+      if (radio) radio.checked = true;
+    }
+    
+    // Restore played_as
+    if (filters.played_as) {
+      const radio = form.querySelector('input[name="played_as"][value="' + filters.played_as + '"]');
+      if (radio) radio.checked = true;
+    }
+    
+    // Restore dates
+    if (filters.date_preset) {
+      setDatePreset(filters.date_preset);
+    } else {
+      if (filters.start_date) document.getElementById('start_date').value = filters.start_date;
+      if (filters.end_date) document.getElementById('end_date').value = filters.end_date;
+    }
+    
+    // Restore rating range
+    if (filters.min_rating) document.getElementById('min_rating').value = filters.min_rating;
+    if (filters.max_rating) document.getElementById('max_rating').value = filters.max_rating;
+    
+    // Restore opponent
+    if (filters.opponent) document.getElementById('opponent').value = filters.opponent;
+    
+    // Restore opening
+    if (filters.opening) document.getElementById('opening').value = filters.opening;
+    
+    // Restore queue options
+    if (filters.include_failed) document.getElementById('include_failed').checked = true;
+    if (filters.limit) document.getElementById('limit').value = filters.limit;
+    
+    // Update count after loading
+    updateCount();
+  } catch (e) {
+    console.error('Failed to load saved filters:', e);
+  }
+}
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('analysis-filter-form');
+  
+  // Load saved filters on page load
+  loadFiltersFromStorage();
+  
+  // Save filters when form is submitted
+  form.addEventListener('submit', function() {
+    saveFiltersToStorage();
+  });
+  
+  // Update count on any filter change
+  form.addEventListener('change', debouncedUpdateCount);
+  form.addEventListener('input', debouncedUpdateCount);
+  
+  // Initial count update
+  updateCount();
+});
+</script>
+
+{{template "foot" .}}
+{{end}}

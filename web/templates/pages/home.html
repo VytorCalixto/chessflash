@@ -3,23 +3,44 @@
 <h1 class="title is-4">Dashboard</h1>
 <p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
 
-<!-- Quick Actions Section -->
+<!-- Analysis Control Section -->
 <div class="box mb-5">
-  <h2 class="title is-5 mb-4">Quick Actions</h2>
+  <h2 class="title is-5 mb-4">Analysis Control</h2>
+  <div class="field is-grouped is-grouped-multiline">
+    <div class="control">
+      <div class="buttons has-addons">
+        <button id="analysis-play-btn" class="button is-primary" style="display: none;">
+          <span class="icon">▶</span>
+          <span>Start</span>
+        </button>
+        <button id="analysis-stop-btn" class="button is-danger" style="display: none;">
+          <span class="icon">⏹</span>
+          <span>Stop</span>
+        </button>
+      </div>
+    </div>
+    <div class="control">
+      <a href="/analysis/queue" class="button is-light">
+        <span class="icon">⚙</span>
+        <span>Configure</span>
+      </a>
+    </div>
+  </div>
+  <div id="filter-summary" class="mt-3" style="display: none;">
+    <p class="help">
+      <strong>Active filters:</strong> <span id="filter-summary-text"></span>
+      <a href="/analysis/queue" class="ml-2">Change</a>
+    </p>
+  </div>
+</div>
+
+<!-- Data Management Section -->
+<div class="box mb-5">
+  <h2 class="title is-5 mb-4">Data Management</h2>
   <div class="field is-grouped">
     <p class="control">
       <form id="import-form" method="post" action="/import" style="display: inline;">
         <button class="button is-primary" type="submit">Import latest games</button>
-      </form>
-    </p>
-    <p class="control">
-      <form id="resume-form" method="post" action="/resume-analysis" style="display: inline;">
-        <button class="button is-link" type="submit">Resume analysis</button>
-      </form>
-    </p>
-    <p class="control">
-      <form id="stop-form" method="post" action="/stop-analysis" style="display: inline;">
-        <button class="button is-danger" type="submit">Stop analysis</button>
       </form>
     </p>
     <p class="control">
@@ -41,7 +62,16 @@
 
 <!-- Analysis Progress Section -->
 <div id="analysis-progress" class="box mb-5" style="display: none;">
-  <h2 class="title is-5 mb-4">Analysis Progress</h2>
+  <div class="level mb-4">
+    <div class="level-left">
+      <div class="level-item">
+        <h2 class="title is-5 mb-0">Analysis Progress</h2>
+      </div>
+      <div class="level-item">
+        <span id="progress-mode" class="tag is-info is-light">Filtered</span>
+      </div>
+    </div>
+  </div>
   <div id="progress-stats" class="mb-4">
     <div class="columns">
       <div class="column">
@@ -140,31 +170,112 @@
 </p>
 
 <script>
-// #region agent log
-(function() {
-  var form = document.getElementById('import-form');
-  var logData = function(msg, data) {
-    fetch('http://127.0.0.1:7243/ingest/1f6c8cec-101d-462a-9c14-fbdf343d2a72',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'home.html:script',message:msg,data:data,timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H3'})}).catch(function(){});
-  };
-  logData('script loaded', {formExists: !!form, formAction: form ? form.action : null, formMethod: form ? form.method : null});
-  if (form) {
-    form.addEventListener('submit', function(e) {
-      logData('form submit event', {defaultPrevented: e.defaultPrevented});
-    });
-    var btn = form.querySelector('button[type="submit"]');
-    if (btn) {
-      btn.addEventListener('click', function(e) {
-        logData('button clicked', {target: e.target.tagName, formId: form.id});
-      });
-    }
-  }
-})();
-// #endregion
 
-// Auto-refresh analysis status every 5 seconds
+// Load saved filters from localStorage
+function loadSavedFilters() {
+  const saved = localStorage.getItem('analysisFilters');
+  if (!saved) return null;
+  try {
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error('Failed to parse saved filters:', e);
+    return null;
+  }
+}
+
+// Convert filters to URL parameters
+function filtersToParams(filters) {
+  if (!filters) return '';
+  const params = new URLSearchParams();
+  
+  if (filters.time_classes && filters.time_classes.length > 0) {
+    filters.time_classes.forEach(tc => params.append('time_class', tc));
+  }
+  if (filters.result) params.append('result', filters.result);
+  if (filters.played_as) params.append('played_as', filters.played_as);
+  if (filters.start_date) params.append('start_date', filters.start_date);
+  if (filters.end_date) params.append('end_date', filters.end_date);
+  if (filters.date_preset) params.append('date_preset', filters.date_preset);
+  if (filters.min_rating) params.append('min_rating', filters.min_rating);
+  if (filters.max_rating) params.append('max_rating', filters.max_rating);
+  if (filters.opponent) params.append('opponent', filters.opponent);
+  if (filters.opening) params.append('opening', filters.opening);
+  if (filters.include_failed) params.append('include_failed', 'true');
+  if (filters.limit) params.append('limit', filters.limit);
+  
+  return params.toString();
+}
+
+// Generate filter summary text
+function generateFilterSummary(filters) {
+  if (!filters) return '';
+  const parts = [];
+  
+  if (filters.time_classes && filters.time_classes.length > 0) {
+    parts.push('Time: ' + filters.time_classes.join(', '));
+  }
+  if (filters.result) parts.push('Result: ' + filters.result);
+  if (filters.played_as) parts.push('Color: ' + filters.played_as);
+  if (filters.date_preset) {
+    parts.push('Period: ' + filters.date_preset.replace(/_/g, ' '));
+  } else if (filters.start_date || filters.end_date) {
+    parts.push('Dates: ' + (filters.start_date || '') + ' to ' + (filters.end_date || ''));
+  }
+  if (filters.min_rating || filters.max_rating) {
+    parts.push('Rating: ' + (filters.min_rating || '') + '-' + (filters.max_rating || ''));
+  }
+  
+  return parts.length > 0 ? parts.join(' • ') : 'All games';
+}
+
+// Update filter summary display
+function updateFilterSummary(filters) {
+  const summaryDiv = document.getElementById('filter-summary');
+  const summaryText = document.getElementById('filter-summary-text');
+  const modeTag = document.getElementById('progress-mode');
+  
+  if (filters && Object.keys(filters).length > 0) {
+    summaryText.textContent = generateFilterSummary(filters);
+    summaryDiv.style.display = 'block';
+    if (modeTag) modeTag.textContent = 'Filtered';
+  } else {
+    summaryDiv.style.display = 'none';
+    if (modeTag) modeTag.textContent = 'All Games';
+  }
+}
+
+// Update analysis control buttons based on whether analysis is actively happening
+function updateAnalysisButtons(isRunning, processing, queueSize) {
+  const playBtn = document.getElementById('analysis-play-btn');
+  const stopBtn = document.getElementById('analysis-stop-btn');
+  
+  // Show stop if there are games being processed or in queue
+  // The pool might be running but idle, so we check actual activity
+  const hasActiveAnalysis = (processing > 0) || (queueSize > 0);
+  
+  if (hasActiveAnalysis && isRunning) {
+    playBtn.style.display = 'none';
+    stopBtn.style.display = 'inline-flex';
+  } else {
+    playBtn.style.display = 'inline-flex';
+    stopBtn.style.display = 'none';
+  }
+}
+
+// Auto-refresh analysis status with dynamic polling
 (function() {
+  const savedFilters = loadSavedFilters();
+  updateFilterSummary(savedFilters);
+  
+  let pollInterval = null;
+  const POLL_INTERVAL_RUNNING = 2000; // 2 seconds when running
+  const POLL_INTERVAL_IDLE = 10000; // 10 seconds when idle (to catch when it starts)
+  
   function updateAnalysisStatus() {
-    fetch('/api/analysis/status')
+    const params = filtersToParams(savedFilters);
+    const url = '/api/analysis/status' + (params ? '?' + params : '');
+    
+    fetch(url)
       .then(function(r) {
         if (!r.ok) {
           throw new Error('Failed to fetch analysis status');
@@ -172,37 +283,155 @@
         return r.json();
       })
       .then(function(data) {
-        document.getElementById('stat-pending').textContent = data.pending || 0;
-        document.getElementById('stat-processing').textContent = data.processing || 0;
+        // Show processing count including queued games (queued = about to be processed)
+        const processingCount = (data.processing || 0) + (data.queue_size || 0);
+        const pendingCount = Math.max(0, (data.pending || 0) - (data.queue_size || 0)); // Pending minus queued
+        
+        document.getElementById('stat-pending').textContent = pendingCount;
+        document.getElementById('stat-processing').textContent = processingCount;
         document.getElementById('stat-completed').textContent = data.completed || 0;
         document.getElementById('stat-estimated').textContent = data.estimated_time || 'N/A';
         
-        var total = (data.pending || 0) + (data.processing || 0) + (data.completed || 0);
-        var progress = total > 0 ? ((data.completed || 0) / total) * 100 : 0;
+        // Use the completed count from API (already filtered)
+        const completedCount = data.completed || 0;
+        var total = pendingCount + processingCount + completedCount;
+        var progress = total > 0 ? (completedCount / total) * 100 : 0;
         var progressBar = document.getElementById('progress-bar');
         progressBar.value = progress;
         progressBar.textContent = Math.round(progress) + '%';
         
-        var queueText = (data.queue_size || 0) + ' in queue';
+        var queueText = (data.queue_size || 0) > 0 ? (data.queue_size || 0) + ' queued, ' : '';
+        var processingText = (data.processing || 0) > 0 ? (data.processing || 0) + ' processing' : '';
+        var statusText = queueText + processingText || 'idle';
         document.getElementById('progress-text').textContent = 
-          (data.completed || 0) + ' of ' + total + ' games analyzed (' + queueText + ')';
+          completedCount + ' of ' + total + ' games analyzed (' + statusText + ')';
         
-        // Show progress section if there are pending/processing games
+        // Update button states based on actual analysis activity
+        // Include queued games as active (they're about to be processed)
+        const hasActiveAnalysis = (data.processing || 0) > 0 || (data.queue_size || 0) > 0;
+        
+        updateAnalysisButtons(
+          data.is_running || false,
+          data.processing || 0,
+          data.queue_size || 0
+        );
+        
+        // Show progress section if there are pending/processing/queued games
         var progressSection = document.getElementById('analysis-progress');
-        if ((data.pending || 0) > 0 || (data.processing || 0) > 0) {
+        if (pendingCount > 0 || processingCount > 0 || (data.completed || 0) > 0) {
           progressSection.style.display = 'block';
         } else {
           progressSection.style.display = 'none';
         }
+        
+        // Adjust polling interval based on analysis activity
+        // If analysis is active, poll every 2 seconds
+        // If idle, poll every 10 seconds (to catch when it starts)
+        // If completely stopped, stop polling
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+        
+        let nextInterval = null;
+        if (hasActiveAnalysis && (data.is_running || false)) {
+          // Analysis is running - poll frequently
+          nextInterval = POLL_INTERVAL_RUNNING;
+          pollInterval = setInterval(updateAnalysisStatus, POLL_INTERVAL_RUNNING);
+        } else if (data.is_running || false) {
+          // Pool is running but idle - poll less frequently to catch when it starts
+          nextInterval = POLL_INTERVAL_IDLE;
+          pollInterval = setInterval(updateAnalysisStatus, POLL_INTERVAL_IDLE);
+        } else {
+          // Analysis is stopped - stop polling
+          nextInterval = null;
+          pollInterval = null;
+        }
       })
       .catch(function(err) {
         console.error('Failed to fetch analysis status:', err);
+        // On error, continue polling but with longer interval
+        if (pollInterval) {
+          clearInterval(pollInterval);
+        }
+        pollInterval = setInterval(updateAnalysisStatus, POLL_INTERVAL_IDLE);
       });
   }
   
-  // Update immediately and then every 5 seconds
+  // Button click handlers
+  document.getElementById('analysis-play-btn').addEventListener('click', function() {
+    const btn = this;
+    const originalText = btn.innerHTML;
+    
+    // Disable button and show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="icon">⏳</span><span>Starting...</span>';
+    
+    const filters = loadSavedFilters();
+    if (!filters || Object.keys(filters).length === 0) {
+      // No filters saved, redirect to config page
+      window.location.href = '/analysis/queue';
+      return;
+    }
+    
+    // Build form data
+    const formData = new FormData();
+    
+    if (filters.time_classes) {
+      filters.time_classes.forEach(tc => {
+        formData.append('time_class', tc);
+      });
+    }
+    if (filters.result) formData.append('result', filters.result);
+    if (filters.played_as) formData.append('played_as', filters.played_as);
+    if (filters.start_date) formData.append('start_date', filters.start_date);
+    if (filters.end_date) formData.append('end_date', filters.end_date);
+    if (filters.date_preset) formData.append('date_preset', filters.date_preset);
+    if (filters.min_rating) formData.append('min_rating', filters.min_rating);
+    if (filters.max_rating) formData.append('max_rating', filters.max_rating);
+    if (filters.opponent) formData.append('opponent', filters.opponent);
+    if (filters.opening) formData.append('opening', filters.opening);
+    if (filters.include_failed) formData.append('include_failed', 'true');
+    if (filters.limit) formData.append('limit', filters.limit);
+    
+    // Use fetch for async submission
+    fetch('/analysis/queue', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(response) {
+      if (response.redirected) {
+        // Success - redirect to home page
+        window.location.href = response.url;
+      } else if (response.ok) {
+        // Also handle non-redirect success
+        window.location.reload();
+      } else {
+        throw new Error('Failed to queue games');
+      }
+    })
+    .catch(function(err) {
+      console.error('Failed to queue games:', err);
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      alert('Failed to start analysis. Please try again.');
+    });
+  });
+  
+  document.getElementById('analysis-stop-btn').addEventListener('click', function() {
+    document.getElementById('stop-form').submit();
+  });
+  
+  // Create hidden stop form
+  const stopForm = document.createElement('form');
+  stopForm.id = 'stop-form';
+  stopForm.method = 'POST';
+  stopForm.action = '/stop-analysis';
+  stopForm.style.display = 'none';
+  document.body.appendChild(stopForm);
+  
+  // Initial update - this will set up the appropriate polling interval based on state
   updateAnalysisStatus();
-  setInterval(updateAnalysisStatus, 5000);
 })();
 </script>
 {{template "foot" .}}

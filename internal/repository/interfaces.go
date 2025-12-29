@@ -19,6 +19,9 @@ type GameRepository interface {
 	ResetProcessingToPending(ctx context.Context, profileID int64) error
 	GamesNeedingAnalysis(ctx context.Context, profileID int64) ([]models.Game, error)
 	CountGamesNeedingAnalysis(ctx context.Context, profileID int64) (int, error)
+	GamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) ([]models.Game, error)
+	CountGamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) (int, error)
+	CountGamesByStatusWithFilter(ctx context.Context, profileID int64, status string, filter models.AnalysisFilter) (int, error)
 	GetExistingChessComIDs(ctx context.Context, profileID int64) (map[string]bool, error)
 	CountByStatus(ctx context.Context, profileID int64, status string) (int, error)
 	GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error)

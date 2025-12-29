@@ -22,6 +22,9 @@ type GameService interface {
 	CountGamesNeedingAnalysis(ctx context.Context, profileID int64) (int, error)
 	CountGamesByStatus(ctx context.Context, profileID int64, status string) (int, error)
 	GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error)
+	CountGamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) (int, error)
+	QueueGamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) (int, error)
+	CountGamesByStatusWithFilter(ctx context.Context, profileID int64, status string, filter models.AnalysisFilter) (int, error)
 }
 
 type gameService struct {
@@ -190,4 +193,58 @@ func (s *gameService) GetAverageAnalysisTime(ctx context.Context, profileID int6
 	}
 
 	return avgTime, nil
+}
+
+func (s *gameService) CountGamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) (int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("counting games for analysis: profile_id=%d", filter.ProfileID)
+
+	count, err := s.gameRepo.CountGamesForAnalysis(ctx, filter)
+	if err != nil {
+		log.Error("failed to count games for analysis: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	return count, nil
+}
+
+func (s *gameService) QueueGamesForAnalysis(ctx context.Context, filter models.AnalysisFilter) (int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("queueing games for analysis: profile_id=%d", filter.ProfileID)
+
+	// Reset any stuck processing games
+	if err := s.gameRepo.ResetProcessingToPending(ctx, filter.ProfileID); err != nil {
+		log.Warn("failed to reset processing games: %v", err)
+	}
+
+	games, err := s.gameRepo.GamesForAnalysis(ctx, filter)
+	if err != nil {
+		log.Error("failed to list games for analysis: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	queuedCount := 0
+	for _, g := range games {
+		if err := s.jobQueue.EnqueueAnalysis(g.ID); err != nil {
+			log.Warn("failed to enqueue analysis for game %d: %v", g.ID, err)
+		} else {
+			queuedCount++
+		}
+	}
+
+	log.Info("queued %d games for analysis", queuedCount)
+	return queuedCount, nil
+}
+
+func (s *gameService) CountGamesByStatusWithFilter(ctx context.Context, profileID int64, status string, filter models.AnalysisFilter) (int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("counting games by status with filter: profile_id=%d, status=%s", profileID, status)
+
+	count, err := s.gameRepo.CountGamesByStatusWithFilter(ctx, profileID, status, filter)
+	if err != nil {
+		log.Error("failed to count games by status with filter: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	return count, nil
 }

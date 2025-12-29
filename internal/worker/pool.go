@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -92,6 +93,10 @@ func (p *Pool) Start(ctx context.Context) {
 }
 
 func (p *Pool) Stop() {
+	p.mu.Lock()
+	p.stopped = true
+	p.mu.Unlock()
+	
 	p.log.Info("stopping worker pool")
 	if p.cancel != nil {
 		p.cancel()
@@ -112,6 +117,29 @@ func (p *Pool) Cancel() {
 		p.cancel()
 		p.cancel = nil
 		p.stopped = true
+	}
+}
+
+// ClearQueue drains all pending jobs from the queue channel.
+// This should be called after Cancel() to ensure the queue is empty.
+// It's safe to call even if the pool is stopped.
+func (p *Pool) ClearQueue() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Drain the channel
+	drained := 0
+	for {
+		select {
+		case <-p.jobs:
+			drained++
+		default:
+			// Channel is empty
+			if drained > 0 {
+				p.log.Info("cleared %d jobs from queue", drained)
+			}
+			return
+		}
 	}
 }
 
@@ -169,9 +197,51 @@ func (p *Pool) Restart(ctx context.Context) {
 	}
 }
 
-func (p *Pool) Submit(job Job) {
-	p.log.Debug("submitting job: %s", job.Name())
-	p.jobs <- job
+var ErrPoolStopped = errors.New("worker pool is stopped")
+
+func (p *Pool) Submit(job Job) error {
+	p.mu.Lock()
+	stopped := p.stopped
+	p.mu.Unlock()
+	
+	if stopped {
+		p.log.Debug("rejected job submission (pool stopped): %s", job.Name())
+		return ErrPoolStopped
+	}
+	
+	// Use recover to catch panic if channel is closed
+	var submitErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was closed, which means pool was stopped
+				p.log.Debug("recovered from panic during job submission (channel closed): %s", job.Name())
+				submitErr = ErrPoolStopped
+			}
+		}()
+		
+		select {
+		case p.jobs <- job:
+			p.log.Debug("submitted job: %s", job.Name())
+			submitErr = nil
+		default:
+			// Channel is full, check if pool was stopped while we were waiting
+			p.mu.Lock()
+			stopped = p.stopped
+			p.mu.Unlock()
+			if stopped {
+				p.log.Debug("rejected job submission (pool stopped): %s", job.Name())
+				submitErr = ErrPoolStopped
+			} else {
+				// Channel is full, but pool is still running - this shouldn't happen with buffered channel
+				// but we'll handle it gracefully
+				p.log.Warn("job queue full, rejecting job: %s", job.Name())
+				submitErr = errors.New("job queue is full")
+			}
+		}
+	}()
+	
+	return submitErr
 }
 
 // QueueSize returns the current number of pending jobs.
@@ -182,4 +252,11 @@ func (p *Pool) QueueSize() int {
 // WorkerCount returns the number of workers in the pool.
 func (p *Pool) WorkerCount() int {
 	return p.workers
+}
+
+// IsRunning returns true if the pool is currently running (not stopped).
+func (p *Pool) IsRunning() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return !p.stopped && p.cancel != nil
 }

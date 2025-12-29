@@ -51,11 +51,11 @@ func NewWorkerQueue(
 }
 
 func (q *WorkerQueue) EnqueueAnalysis(gameID int64) error {
-	q.analysisPool.Submit(&worker.AnalyzeGameJob{
+	err := q.analysisPool.Submit(&worker.AnalyzeGameJob{
 		AnalysisService: q.analysisService,
 		GameID:          gameID,
 	})
-	return nil
+	return err
 }
 
 func (q *WorkerQueue) EnqueueImport(profileID int64, username string) error {
@@ -70,7 +70,7 @@ func (q *WorkerQueue) EnqueueImport(profileID int64, username string) error {
 		}
 	}
 	
-	q.importPool.Submit(&worker.ImportGamesJob{
+	err = q.importPool.Submit(&worker.ImportGamesJob{
 		DB:             q.db,
 		ChessClient:    q.chessClient,
 		Profile:        *profile,
@@ -80,5 +80,5 @@ func (q *WorkerQueue) EnqueueImport(profileID int64, username string) error {
 		ArchiveLimit:   q.archiveLimit,
 		MaxConcurrent:  q.maxConcurrent,
 	})
-	return nil
+	return err
 }

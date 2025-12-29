@@ -40,6 +40,21 @@ type GameFilter struct {
 	OrderDir    string
 }
 
+type AnalysisFilter struct {
+	ProfileID     int64
+	TimeClasses   []string // Support multiple time classes
+	Result        string
+	Opponent      string
+	OpeningName   string
+	StartDate     *time.Time
+	EndDate       *time.Time
+	Limit         int
+	MinRating     int
+	MaxRating     int
+	PlayedAs      string
+	IncludeFailed bool
+}
+
 type Position struct {
 	ID             int64     `json:"id"`
 	GameID         int64     `json:"game_id"`
@@ -216,9 +231,9 @@ type FlashcardTimeStat struct {
 }
 
 type SummaryStat struct {
-	TotalGames        int     `json:"total_games"`
-	OverallWinRate    float64 `json:"overall_win_rate"`
-	CurrentRating     int     `json:"current_rating"`
-	TotalBlunders     int     `json:"total_blunders"`
+	TotalGames         int     `json:"total_games"`
+	OverallWinRate     float64 `json:"overall_win_rate"`
+	CurrentRating      int     `json:"current_rating"`
+	TotalBlunders      int     `json:"total_blunders"`
 	AvgBlundersPerGame float64 `json:"avg_blunders_per_game"`
 }
