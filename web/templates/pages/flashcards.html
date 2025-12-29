@@ -204,6 +204,7 @@
     const chess = new Chess(fen);
     const sideToMove = fen.split(" ")[1] === "w" ? "white" : "black";
     let attempted = false;
+    let cardStartTime = Date.now(); // Track when card is displayed
 
     function getLegalMoves(chess) {
       const dests = new Map();
@@ -404,6 +405,10 @@
     function revealResult(isCorrect, moveUci) {
       attempted = true;
       const loss = Math.abs(evalDiff).toFixed(1);
+      
+      // Calculate time taken
+      const timeElapsed = cardStartTime ? (Date.now() - cardStartTime) / 1000 : 0;
+      
       if (isCorrect) {
         feedbackEl.textContent = "Excellent! You found the best move.";
         feedbackEl.classList.remove("has-text-danger");
@@ -422,12 +427,23 @@
         }
       }
       metaEl.textContent = classificationNote();
+      
+      // Add hidden input for time
+      const timeInput = document.createElement('input');
+      timeInput.type = 'hidden';
+      timeInput.name = 'time_seconds';
+      timeInput.value = timeElapsed.toFixed(2);
+      reviewForm.appendChild(timeInput);
+      
       reviewForm.classList.remove("is-hidden");
       cg.set({ movable: { color: undefined } });
     }
 
     showAnswerBtn.addEventListener("click", function() {
       if (attempted) return;
+      
+      // Calculate time taken
+      const timeElapsed = cardStartTime ? (Date.now() - cardStartTime) / 1000 : 0;
       
       // Draw arrow for best move
       if (bestMove && bestMove.length >= 4) {
@@ -441,6 +457,14 @@
       feedbackEl.classList.add("has-text-info");
       metaEl.textContent = classificationNote();
       lossEl.textContent = `Original move (${movePlayed}) lost ${Math.abs(evalDiff).toFixed(1)} pawns.`;
+      
+      // Add hidden input for time
+      const timeInput = document.createElement('input');
+      timeInput.type = 'hidden';
+      timeInput.name = 'time_seconds';
+      timeInput.value = timeElapsed.toFixed(2);
+      reviewForm.appendChild(timeInput);
+      
       reviewForm.classList.remove("is-hidden");
       attempted = true;
       cg.set({ movable: { color: undefined } });

@@ -481,9 +481,16 @@ func (s *Server) handleReviewFlashcard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get time_seconds from form (optional, defaults to 0)
+	timeSeconds, _ := strconv.ParseFloat(r.FormValue("time_seconds"), 64)
+	if timeSeconds < 0 {
+		timeSeconds = 0
+	}
+
 	log = log.WithFields(map[string]any{
 		"flashcard_id": id,
 		"quality":      quality,
+		"time_seconds": timeSeconds,
 	})
 	log.Debug("reviewing flashcard")
 
@@ -510,6 +517,14 @@ func (s *Server) handleReviewFlashcard(w http.ResponseWriter, r *http.Request) {
 		log.Error("failed to update flashcard: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Store review history with timing data
+	if timeSeconds > 0 {
+		if err := s.DB.InsertReviewHistory(r.Context(), card.ID, quality, timeSeconds); err != nil {
+			log.Warn("failed to store review history: %v", err)
+			// Don't fail the review if history storage fails
+		}
 	}
 
 	log.Info("flashcard reviewed successfully")
@@ -790,6 +805,63 @@ func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	log.Debug("rendering analytics hub page")
 	s.render(w, r, "pages/analytics.html", pageData{
 		"profile": profile,
+	})
+}
+
+func (s *Server) handleFlashcardAnalytics(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context, redirecting to /profiles")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	log = log.WithField("username", profile.Username)
+	log.Debug("fetching flashcard analytics")
+
+	overallStats, err := s.DB.FlashcardStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get flashcard stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	classificationStats, err := s.DB.FlashcardClassificationStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get classification stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	phaseStats, err := s.DB.FlashcardPhaseStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get phase stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	openingStats, err := s.DB.FlashcardOpeningStats(r.Context(), profile.ID, 20)
+	if err != nil {
+		log.Error("failed to get opening stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	timeStats, err := s.DB.FlashcardTimeStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get time stats: %v", err)
+		// Don't fail if time stats aren't available (no reviews yet)
+		timeStats = nil
+	}
+
+	s.render(w, r, "pages/flashcard_analytics.html", pageData{
+		"overall_stats":        overallStats,
+		"classification_stats":  classificationStats,
+		"phase_stats":          phaseStats,
+		"opening_stats":        openingStats,
+		"time_stats":           timeStats,
+		"profile":              profile,
 	})
 }
 

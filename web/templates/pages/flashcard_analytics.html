@@ -1,0 +1,201 @@
+{{define "pages/flashcard_analytics.html"}}
+{{template "head" .}}
+<h1 class="title is-4">Flashcard Analytics</h1>
+<p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
+
+{{if .overall_stats}}
+<div class="columns is-multiline mt-4">
+  <!-- Overall Stats Cards -->
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Total Cards</p>
+        <p class="title is-3">{{.overall_stats.TotalCards}}</p>
+      </div>
+    </div>
+  </div>
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Total Reviews</p>
+        <p class="title is-3">{{.overall_stats.TotalReviews}}</p>
+      </div>
+    </div>
+  </div>
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Overall Accuracy</p>
+        <p class="title is-3">{{printf "%.1f" .overall_stats.OverallAccuracy}}%</p>
+      </div>
+    </div>
+  </div>
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Cards Mastered</p>
+        <p class="title is-3">{{.overall_stats.CardsMastered}}</p>
+        <p class="help">Ease > 2.5, Interval > 30 days</p>
+      </div>
+    </div>
+  </div>
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Cards Struggling</p>
+        <p class="title is-3">{{.overall_stats.CardsStruggling}}</p>
+        <p class="help">Ease < 2.0, Reviewed > 3 times</p>
+      </div>
+    </div>
+  </div>
+  <div class="column is-one-third">
+    <div class="card">
+      <div class="card-content">
+        <p class="heading">Cards Due Now</p>
+        <p class="title is-3">{{.overall_stats.CardsDue}}</p>
+        <p class="help">{{.overall_stats.CardsDueSoon}} due in next 7 days</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{if .time_stats}}
+<h2 class="title is-5 mt-5">Time Statistics</h2>
+<div class="columns is-multiline mt-2">
+  <div class="column is-one-quarter">
+    <div class="box">
+      <p class="heading">Average Time</p>
+      <p class="title is-4">{{printf "%.1f" .time_stats.AvgTimeSeconds}}s</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box">
+      <p class="heading">Median Time</p>
+      <p class="title is-4">{{printf "%.1f" .time_stats.MedianTimeSeconds}}s</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box">
+      <p class="heading">Fastest</p>
+      <p class="title is-4">{{printf "%.1f" .time_stats.FastestTime}}s</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box">
+      <p class="heading">Slowest</p>
+      <p class="title is-4">{{printf "%.1f" .time_stats.SlowestTime}}s</p>
+    </div>
+  </div>
+</div>
+{{if .time_stats.TimeByQuality}}
+<div class="box mt-2">
+  <p class="heading mb-3">Average Time by Quality</p>
+  <table class="table is-narrow">
+    <thead>
+      <tr>
+        <th>Quality</th>
+        <th>Average Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range $quality, $time := .time_stats.TimeByQuality}}
+      <tr>
+        <td>
+          {{if eq $quality 0}}Again{{else if eq $quality 1}}Hard{{else if eq $quality 2}}Good{{else if eq $quality 3}}Easy{{end}}
+        </td>
+        <td>{{printf "%.1f" $time}}s</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}
+
+<h2 class="title is-5 mt-5">Performance by Mistake Type</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Cards</th>
+      <th>Reviews</th>
+      <th>Accuracy</th>
+      <th>Avg Ease</th>
+      <th>Avg Reviews Needed</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .classification_stats}}
+    <tr>
+      <td><strong>{{.Classification}}</strong></td>
+      <td>{{.TotalCards}}</td>
+      <td>{{.TotalReviews}}</td>
+      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
+      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+      <td>{{printf "%.1f" .AvgReviewsNeeded}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-5">Performance by Game Phase</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Cards</th>
+      <th>Reviews</th>
+      <th>Accuracy</th>
+      <th>Avg Ease</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .phase_stats}}
+    <tr>
+      <td><strong>{{.Phase}}</strong></td>
+      <td>{{.TotalCards}}</td>
+      <td>{{.TotalReviews}}</td>
+      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
+      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="5">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-5">Performance by Opening</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Opening</th>
+      <th>ECO</th>
+      <th>Cards</th>
+      <th>Reviews</th>
+      <th>Accuracy</th>
+      <th>Avg Ease</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .opening_stats}}
+    <tr>
+      <td>{{.OpeningName}}</td>
+      <td>{{.ECOCode}}</td>
+      <td>{{.TotalCards}}</td>
+      <td>{{.TotalReviews}}</td>
+      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
+      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No flashcard data available yet. Start reviewing flashcards to see analytics!</p>
+{{end}}
+
+{{template "foot" .}}
+{{end}}
