@@ -1,0 +1,47 @@
+{{define "head"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess Flashcards</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <style>
+    body { padding: 16px; }
+    .eval-chart { max-height: 320px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar" role="navigation">
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="/">Home</a>
+        <a class="navbar-item" href="/games">Games</a>
+        <a class="navbar-item" href="/openings">Openings</a>
+        <a class="navbar-item" href="/flashcards">Flashcards</a>
+      </div>
+      <div class="navbar-end pr-4">
+        <div class="navbar-item">
+          <span class="mr-2">Profile: {{if .profile}}{{.profile.Username}}{{else}}none{{end}}</span>
+          <a class="button is-light" href="/profiles">Switch profile</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <section class="section pt-3">
+    <div class="container">
+{{end}}
+
+{{define "foot"}}
+    </div>
+  </section>
+</body>
+</html>
+{{end}}
+

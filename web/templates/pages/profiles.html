@@ -1,0 +1,50 @@
+{{define "pages/profiles.html"}}
+{{template "head" .}}
+<div class="box">
+  <h1 class="title is-4">Select a profile</h1>
+  <p class="subtitle is-6">Choose an existing profile or add a new one.</p>
+  <form class="field has-addons" method="post" action="/profiles">
+    <div class="control is-expanded">
+      <input class="input" type="text" name="username" placeholder="Chess.com username" required>
+    </div>
+    <div class="control">
+      <button class="button is-primary" type="submit">Add profile</button>
+    </div>
+  </form>
+</div>
+
+<div class="columns is-multiline">
+  {{range .profiles}}
+  <div class="column is-one-third">
+    <div class="card">
+      <header class="card-header">
+        <p class="card-header-title">
+          {{.Username}}
+          {{if and $.current (eq $.current.ID .ID)}}
+          <span class="tag is-success ml-2">Current</span>
+          {{end}}
+        </p>
+      </header>
+      <div class="card-content">
+        <p class="is-size-7 has-text-grey">Created: {{.CreatedAt.Format "2006-01-02"}}</p>
+        <p class="is-size-7 has-text-grey">Last sync: {{if .LastSyncAt}}{{.LastSyncAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</p>
+      </div>
+      <footer class="card-footer">
+        <form class="card-footer-item" method="post" action="/profiles/{{.ID}}/select">
+          <button class="button is-link is-light is-fullwidth" type="submit">Select</button>
+        </form>
+        <form class="card-footer-item" method="post" action="/profiles/{{.ID}}/delete" onsubmit="return confirm('Delete this profile and all related data?');">
+          <button class="button is-danger is-light is-fullwidth" type="submit">Delete</button>
+        </form>
+      </footer>
+    </div>
+  </div>
+  {{else}}
+  <div class="column is-full">
+    <div class="notification is-info">No profiles yet. Add one above to get started.</div>
+  </div>
+  {{end}}
+</div>
+{{template "foot" .}}
+{{end}}
+

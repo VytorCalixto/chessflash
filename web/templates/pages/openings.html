@@ -1,0 +1,38 @@
+{{define "pages/openings.html"}}
+{{template "head" .}}
+<h1 class="title is-4">Opening statistics</h1>
+<p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
+
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Opening</th>
+      <th>ECO</th>
+      <th>Games</th>
+      <th>W</th>
+      <th>D</th>
+      <th>L</th>
+      <th>Win %</th>
+      <th>Avg blunders</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .stats}}
+    <tr>
+      <td>{{.OpeningName}}</td>
+      <td>{{.ECOCode}}</td>
+      <td>{{.TotalGames}}</td>
+      <td>{{.Wins}}</td>
+      <td>{{.Draws}}</td>
+      <td>{{.Losses}}</td>
+      <td>{{printf "%.1f" .WinRate}}</td>
+      <td>{{printf "%.2f" .AvgBlunders}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="8">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}
+{{end}}
+

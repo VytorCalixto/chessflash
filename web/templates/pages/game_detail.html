@@ -1,0 +1,32 @@
+{{define "pages/game_detail.html"}}
+{{template "head" .}}
+<h1 class="title is-4">Game vs {{.game.Opponent}} ({{.game.TimeClass}})</h1>
+<p>Result: {{.game.Result}} | Opening: {{.game.OpeningName}} ({{.game.ECOCode}})</p>
+
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Move</th>
+      <th>Best move</th>
+      <th>Δ eval (cp)</th>
+      <th>Classification</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .positions}}
+    <tr>
+      <td>{{.MoveNumber}}</td>
+      <td>{{.MovePlayed}}</td>
+      <td>{{.BestMove}}</td>
+      <td>{{printf "%.0f" .EvalDiff}}</td>
+      <td>{{.Classification}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="5">Analysis pending or not available.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}
+{{end}}
+

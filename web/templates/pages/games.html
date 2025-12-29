@@ -1,0 +1,136 @@
+{{define "pages/games.html"}}
+{{template "head" .}}
+<div class="block">
+  <h1 class="title is-4">Games</h1>
+  <form id="filter-form" class="columns is-multiline" method="get" action="/games">
+    <div class="column is-one-quarter">
+      <label class="label">Time class</label>
+      <div class="select is-fullwidth">
+        <select name="time_class" onchange="this.form.submit()">
+          <option value="">Any</option>
+          {{range $opt := (slice "bullet" "blitz" "rapid" "daily")}}
+            <option value="{{$opt}}" {{if eq (getFilter $.filters "time_class") $opt}}selected{{end}}>{{$opt}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
+    <div class="column is-one-quarter">
+      <label class="label">Result</label>
+      <div class="select is-fullwidth">
+        <select name="result" onchange="this.form.submit()">
+          <option value="">Any</option>
+          {{range $opt := (slice "win" "draw" "loss")}}
+            <option value="{{$opt}}" {{if eq (getFilter $.filters "result") $opt}}selected{{end}}>{{$opt}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
+    <div class="column is-one-quarter">
+      <label class="label">Opening</label>
+      <input class="input" type="text" name="opening" value="{{getFilter .filters "opening"}}" onchange="this.form.submit()" placeholder="Search opening...">
+    </div>
+    <div class="column is-one-quarter">
+      <label class="label">Per page</label>
+      <div class="select is-fullwidth">
+        <select name="per_page" onchange="this.form.submit()">
+          {{range $opt := (slice "10" "25" "50" "100")}}
+            <option value="{{$opt}}" {{if eq (printf "%d" $.per_page) $opt}}selected{{end}}>{{$opt}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
+    <input type="hidden" name="order_by" value="{{.order_by}}">
+    <input type="hidden" name="order_dir" value="{{.order_dir}}">
+    <input type="hidden" name="page" value="1">
+  </form>
+</div>
+
+{{$timeClass := getFilter .filters "time_class"}}
+{{$result := getFilter .filters "result"}}
+{{$opening := getFilter .filters "opening"}}
+{{$queryBase := printf "per_page=%d&order_by=%s&order_dir=%s" .per_page .order_by .order_dir}}
+{{if $timeClass}}{{$queryBase = printf "%s&time_class=%s" $queryBase (urlquery $timeClass)}}{{end}}
+{{if $result}}{{$queryBase = printf "%s&result=%s" $queryBase (urlquery $result)}}{{end}}
+{{if $opening}}{{$queryBase = printf "%s&opening=%s" $queryBase (urlquery $opening)}}{{end}}
+
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      {{$nextDir := "ASC"}}
+      {{if eq .order_dir "ASC"}}{{$nextDir = "DESC"}}{{end}}
+      <th>
+        <a href="/games?page=1&order_by=played_at&order_dir={{$nextDir}}&{{$queryBase}}">
+          Date {{if eq .order_dir "ASC"}}▲{{else}}▼{{end}}
+        </a>
+      </th>
+      <th>Opponent</th>
+      <th>Result</th>
+      <th>Time</th>
+      <th>Opening</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .games}}
+    <tr>
+      <td>{{.PlayedAt.Format "2006-01-02 15:04"}}</td>
+      <td>{{.Opponent}}</td>
+      <td>{{.Result}}</td>
+      <td>{{.TimeClass}}</td>
+      <td>{{.OpeningName}}</td>
+      <td><a href="/games/{{.ID}}">{{.AnalysisStatus}}</a></td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6">No games yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{if gt .total_pages 1}}
+<nav class="pagination is-centered" role="navigation" aria-label="pagination">
+  {{if gt .page 1}}
+    <a class="pagination-previous" href="/games?page={{sub .page 1}}&{{$queryBase}}">Previous</a>
+  {{else}}
+    <a class="pagination-previous is-disabled" aria-disabled="true">Previous</a>
+  {{end}}
+  {{if lt .page .total_pages}}
+    <a class="pagination-next" href="/games?page={{add .page 1}}&{{$queryBase}}">Next</a>
+  {{else}}
+    <a class="pagination-next is-disabled" aria-disabled="true">Next</a>
+  {{end}}
+  <ul class="pagination-list">
+    {{$start := .page}}
+    {{$end := .page}}
+    {{if gt $start 3}}
+      {{$start = sub $start 2}}
+    {{else}}
+      {{$start = 1}}
+    {{end}}
+    {{if lt $end (sub .total_pages 2)}}
+      {{$end = add .page 2}}
+    {{else}}
+      {{$end = .total_pages}}
+    {{end}}
+
+    <li><a class="pagination-link {{if eq .page 1}}is-current{{end}}" aria-label="Go to page 1" href="/games?page=1&{{$queryBase}}">1</a></li>
+    {{if gt $start 2}}
+      <li><span class="pagination-ellipsis">&hellip;</span></li>
+    {{end}}
+
+    {{range $i := seq (max 2 $start) (min (sub $.total_pages 1) $end)}}
+      <li><a class="pagination-link {{if eq $.page $i}}is-current{{end}}" aria-label="Go to page {{$i}}" href="/games?page={{$i}}&{{$queryBase}}">{{$i}}</a></li>
+    {{end}}
+
+    {{if lt $end (sub .total_pages 1)}}
+      <li><span class="pagination-ellipsis">&hellip;</span></li>
+    {{end}}
+    {{if gt .total_pages 1}}
+      <li><a class="pagination-link {{if eq .page .total_pages}}is-current{{end}}" aria-label="Go to page {{.total_pages}}" href="/games?page={{.total_pages}}&{{$queryBase}}">{{.total_pages}}</a></li>
+    {{end}}
+  </ul>
+</nav>
+{{end}}
+
+{{template "foot" .}}
+{{end}}
+

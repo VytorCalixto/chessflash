@@ -1,0 +1,338 @@
+{{define "pages/flashcards.html"}}
+{{template "head" .}}
+<style>
+  .flashcard-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .board-area {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+  }
+  .board-wrapper {
+    width: 480px;
+  }
+  #board {
+    width: 480px;
+    height: 480px;
+  }
+  .eval-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 28px;
+    flex-shrink: 0;
+    margin-right: 4px;
+  }
+  .eval-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 3px 4px;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .eval-label.white-advantage {
+    background: #fff;
+    color: #222;
+    border: 1px solid #ccc;
+    border-bottom: none;
+  }
+  .eval-label.black-advantage {
+    background: #262421;
+    color: #fff;
+    border: 1px solid #262421;
+    border-bottom: none;
+  }
+  .eval-track {
+    position: relative;
+    width: 100%;
+    height: 480px;
+    overflow: hidden;
+    background: #262421;
+    border: 1px solid #262421;
+    box-sizing: border-box;
+  }
+  .eval-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    transition: height 0.3s ease;
+  }
+  .feedback-box {
+    background: #f9f9f9;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+  }
+  .best-move {
+    font-family: monospace;
+  }
+  .is-hidden-soft {
+    display: none;
+  }
+  .player-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+  }
+  .player-info .player-name {
+    font-weight: 600;
+  }
+  .player-info .piece-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+  }
+  .player-info .piece-icon.white {
+    background: #fff;
+    border: 1px solid #ccc;
+  }
+  .player-info .piece-icon.black {
+    background: #262421;
+    border: 1px solid #262421;
+  }
+  @media (max-width: 960px) {
+    .flashcard-layout {
+      flex-direction: column;
+    }
+    .board-wrapper {
+      width: 100%;
+      max-width: 480px;
+    }
+    #board {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+    }
+    .eval-track {
+      height: 100%;
+    }
+  }
+</style>
+
+<h1 class="title is-4">Flashcards</h1>
+{{if .card}}
+<div class="flashcard-layout">
+  <div>
+    <div class="mb-2 has-text-grey is-size-7">
+      Move #{{.card.MoveNumber}} &nbsp;|&nbsp; Classification: {{.card.Classification}} &nbsp;|&nbsp; Played: {{.card.MovePlayed}} &nbsp;|&nbsp; White: {{.card.WhitePlayer}} vs Black: {{.card.BlackPlayer}}
+    </div>
+    <div class="player-info" id="player-top">
+      <span class="piece-icon" id="icon-top"></span>
+      <span class="player-name" id="name-top"></span>
+    </div>
+    <div class="board-area">
+      <div class="eval-bar">
+        <div class="eval-label white-advantage" id="eval-label">+0.0</div>
+        <div class="eval-track">
+          <div class="eval-fill" id="eval-fill"></div>
+        </div>
+      </div>
+      <div class="board-wrapper">
+        <div id="board"></div>
+      </div>
+    </div>
+    <div class="player-info" id="player-bottom">
+      <span class="piece-icon" id="icon-bottom"></span>
+      <span class="player-name" id="name-bottom"></span>
+    </div>
+    <div class="mt-3">
+      <button id="show-answer" class="button is-light is-small">Show answer</button>
+    </div>
+  </div>
+</div>
+
+<div class="feedback-box mt-4">
+  <p id="prompt-text" class="has-text-weight-semibold">Find the best move in this position</p>
+  <p id="feedback-text" class="mt-1"></p>
+  <p id="loss-text" class="mt-1 has-text-danger"></p>
+  <p id="meta-text" class="mt-1 is-size-7 has-text-grey"></p>
+</div>
+
+<form id="review-form" class="mt-4 is-hidden" method="post" action="/flashcards/{{.card.ID}}/review">
+  <div class="buttons">
+    <button class="button is-danger" name="quality" value="0">Again</button>
+    <button class="button is-warning" name="quality" value="1">Hard</button>
+    <button class="button is-success" name="quality" value="2">Good</button>
+    <button class="button is-primary" name="quality" value="3">Easy</button>
+  </div>
+</form>
+{{else}}
+<p>No cards due. Come back later!</p>
+{{end}}
+
+{{if .card}}
+<script>
+  (function() {
+    const fen = "{{.card.FEN}}";
+    const bestMove = "{{.card.BestMove}}".trim();
+    const evalBefore = {{printf "%.2f" .card.EvalBefore}};
+    const evalAfter = {{printf "%.2f" .card.EvalAfter}};
+    const evalDiff = {{printf "%.2f" .card.EvalDiff}};
+    const classification = "{{.card.Classification}}".toLowerCase();
+    const movePlayed = "{{.card.MovePlayed}}";
+    const whitePlayer = "{{.card.WhitePlayer}}";
+    const blackPlayer = "{{.card.BlackPlayer}}";
+    console.log("Player names:", { whitePlayer, blackPlayer });
+
+    const promptEl = document.getElementById("prompt-text");
+    const feedbackEl = document.getElementById("feedback-text");
+    const lossEl = document.getElementById("loss-text");
+    const metaEl = document.getElementById("meta-text");
+    const reviewForm = document.getElementById("review-form");
+    const showAnswerBtn = document.getElementById("show-answer");
+    const evalFill = document.getElementById("eval-fill");
+    const evalLabel = document.getElementById("eval-label");
+
+    const chess = new Chess(fen);
+    const sideToMove = fen.split(" ")[1] === "w" ? "white" : "black";
+    let attempted = false;
+
+
+    // Prefer local CDN/asset path if available; fall back to unpkg
+    const pieceThemeUrl = "/static/chessboard/img/chesspieces/wikipedia/{piece}.png";
+    let board;
+    try {
+      if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
+        throw new Error("Chess or Chessboard not loaded");
+      }
+      board = Chessboard("board", {
+        position: fen,
+        draggable: true,
+        orientation: sideToMove,
+        pieceTheme: pieceThemeUrl,
+        onDrop: handleDrop
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    function clampEval(val) {
+      if (val > 10) return 10;
+      if (val < -10) return -10;
+      return val;
+    }
+
+    function updateEvalBar(value) {
+      const clamped = clampEval(value);
+      const percent = ((clamped + 10) / 20) * 100;
+      evalFill.style.height = percent + "%";
+      evalLabel.textContent = (value >= 0 ? "+" : "") + value.toFixed(1);
+      
+      // Update label styling based on advantage
+      if (value >= 0) {
+        evalLabel.classList.remove("black-advantage");
+        evalLabel.classList.add("white-advantage");
+      } else {
+        evalLabel.classList.remove("white-advantage");
+        evalLabel.classList.add("black-advantage");
+      }
+    }
+
+    function contextualPrompt() {
+      if (evalBefore > 2) return "Find the move to keep your advantage";
+      if (evalBefore > 0.5) return "Maintain the pressure with the best move";
+      if (evalBefore < -2) return "Find the move to stay in the game";
+      if (evalBefore < -0.5) return "Find the best defensive resource";
+      return "Find the best move in this balanced position";
+    }
+
+    function classificationNote() {
+      switch (classification) {
+        case "blunder": return "You missed a critical idea here.";
+        case "mistake": return "There was a better option.";
+        case "inaccuracy": return "A small improvement was possible.";
+        default: return "";
+      }
+    }
+
+    function moveToUci(moveObj) {
+      if (!moveObj) return "";
+      const promo = moveObj.promotion ? moveObj.promotion : "";
+      return `${moveObj.from}${moveObj.to}${promo}`;
+    }
+
+    function revealResult(isCorrect, moveUci) {
+      attempted = true;
+      const loss = Math.abs(evalDiff).toFixed(1);
+      if (isCorrect) {
+        feedbackEl.textContent = "Excellent! You found the best move.";
+        feedbackEl.classList.remove("has-text-danger");
+        feedbackEl.classList.add("has-text-success");
+        lossEl.textContent = "";
+      } else {
+        feedbackEl.textContent = `Not quite. The best move was ${bestMove}.`;
+        feedbackEl.classList.remove("has-text-success");
+        feedbackEl.classList.add("has-text-danger");
+        lossEl.textContent = `Your original move lost ${loss} pawns of advantage.`;
+      }
+      metaEl.textContent = classificationNote();
+      reviewForm.classList.remove("is-hidden");
+      board.draggable = false;
+    }
+
+    function handleDrop(source, target) {
+      if (attempted) return "snapback";
+
+      const move = chess.move({ from: source, to: target, promotion: "q" });
+      if (!move) return "snapback";
+
+      const played = moveToUci(move);
+      const isCorrect = played === bestMove;
+      revealResult(isCorrect, played);
+    }
+
+    showAnswerBtn.addEventListener("click", function() {
+      if (attempted) return;
+      feedbackEl.textContent = `Best move: ${bestMove}`;
+      feedbackEl.classList.remove("has-text-danger");
+      feedbackEl.classList.add("has-text-info");
+      metaEl.textContent = classificationNote();
+      lossEl.textContent = `Original move (${movePlayed}) lost ${Math.abs(evalDiff).toFixed(1)} pawns.`;
+      reviewForm.classList.remove("is-hidden");
+      attempted = true;
+      board.draggable = false;
+    });
+
+    // Set player names based on board orientation
+    function setupPlayerNames() {
+      const nameTop = document.getElementById("name-top");
+      const nameBottom = document.getElementById("name-bottom");
+      const iconTop = document.getElementById("icon-top");
+      const iconBottom = document.getElementById("icon-bottom");
+      
+      if (sideToMove === "white") {
+        // White at bottom, black at top
+        nameBottom.textContent = whitePlayer;
+        nameTop.textContent = blackPlayer;
+        iconBottom.classList.add("white");
+        iconTop.classList.add("black");
+      } else {
+        // Black at bottom, white at top
+        nameBottom.textContent = blackPlayer;
+        nameTop.textContent = whitePlayer;
+        iconBottom.classList.add("black");
+        iconTop.classList.add("white");
+      }
+    }
+
+    // Initial UI state
+    promptEl.textContent = contextualPrompt();
+    updateEvalBar(evalBefore);
+    setupPlayerNames();
+    _log("H3", "flashcards.js:ready", "ui ready", {});
+  })();
+</script>
+{{end}}
+
+{{template "foot" .}}
+{{end}}
+

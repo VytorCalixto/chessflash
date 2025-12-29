@@ -1,0 +1,49 @@
+{{define "pages/home.html"}}
+{{template "head" .}}
+<div class="box">
+  <h1 class="title is-4">Import games for {{if .profile}}{{.profile.Username}}{{else}}your profile{{end}}</h1>
+  <form id="import-form" method="post" action="/import">
+    <div class="field">
+      <button class="button is-primary" type="submit">Import latest games</button>
+    </div>
+  </form>
+  <div class="mt-4"></div>
+  <form id="resume-form" method="post" action="/resume-analysis">
+    <div class="field is-grouped">
+      <p class="control">
+        <button class="button is-link" type="submit">Resume analysis</button>
+      </p>
+      <p class="control">
+        <span class="tag is-light">Pending: {{.pending_count}}</span>
+      </p>
+    </div>
+  </form>
+  <p class="is-size-7 has-text-grey">
+    Need a different account? Use <a href="/profiles">Switch profile</a>.
+  </p>
+</div>
+<script>
+// #region agent log
+(function() {
+  var form = document.getElementById('import-form');
+  var logData = function(msg, data) {
+    fetch('http://127.0.0.1:7243/ingest/1f6c8cec-101d-462a-9c14-fbdf343d2a72',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'home.html:script',message:msg,data:data,timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H3'})}).catch(function(){});
+  };
+  logData('script loaded', {formExists: !!form, formAction: form ? form.action : null, formMethod: form ? form.method : null});
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      logData('form submit event', {defaultPrevented: e.defaultPrevented});
+    });
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.addEventListener('click', function(e) {
+        logData('button clicked', {target: e.target.tagName, formId: form.id});
+      });
+    }
+  }
+})();
+// #endregion
+</script>
+{{template "foot" .}}
+{{end}}
+
