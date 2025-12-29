@@ -1,13 +1,17 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/vytor/chessflash/internal/analysis"
 	"github.com/vytor/chessflash/internal/chesscom"
 	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/flashcard"
@@ -510,6 +514,60 @@ func (s *Server) handleReviewFlashcard(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("flashcard reviewed successfully")
 	http.Redirect(w, r, "/flashcards", http.StatusSeeOther)
+}
+
+func (s *Server) handleEvaluatePosition(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+
+	// Get FEN from query parameter
+	fen := r.URL.Query().Get("fen")
+	if fen == "" {
+		http.Error(w, "fen parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// Use a lighter depth for real-time evaluation (faster response)
+	depth := 15
+	if s.StockfishDepth > 0 && s.StockfishDepth < 15 {
+		depth = s.StockfishDepth
+	}
+
+	log = log.WithFields(map[string]any{
+		"fen":   fen,
+		"depth": depth,
+	})
+	log.Debug("evaluating position")
+
+	// Create a new Stockfish engine for this request
+	// Note: In production, you might want to use a pool of engines
+	sf, err := analysis.NewEngine(s.StockfishPath)
+	if err != nil {
+		log.Error("failed to initialize stockfish: %v", err)
+		http.Error(w, "failed to initialize engine", http.StatusInternalServerError)
+		return
+	}
+	defer sf.Close()
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	result, err := sf.EvaluateFEN(ctx, fen, depth)
+	if err != nil {
+		log.Error("failed to evaluate position: %v", err)
+		http.Error(w, "evaluation failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"cp":   result.CP,
+		"mate": result.Mate,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Error("failed to encode response: %v", err)
+	}
 }
 
 func (s *Server) handleOpenings(w http.ResponseWriter, r *http.Request) {

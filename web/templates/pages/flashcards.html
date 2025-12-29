@@ -230,7 +230,16 @@
       return `${moveObj.from}${moveObj.to}${promo}`;
     }
 
-    function handleMove(orig, dest) {
+    function showEvalLoading() {
+      evalLabel.textContent = "...";
+      evalLabel.style.opacity = "0.6";
+    }
+
+    function hideEvalLoading() {
+      evalLabel.style.opacity = "1";
+    }
+
+    async function handleMove(orig, dest) {
       if (attempted) return;
 
       const move = chess.move({ from: orig, to: dest, promotion: 'q' });
@@ -245,8 +254,50 @@
 
       const played = moveToUci(move);
       const isCorrect = played === bestMove;
-      // Update eval bar to show eval after the move
-      updateEvalBar(evalAfter, mateAfter);
+      
+      // Show loading state on eval bar
+      showEvalLoading();
+      
+      // Get evaluation for the user's actual move
+      try {
+        const response = await fetch(`/api/evaluate?fen=${encodeURIComponent(chess.fen())}`);
+        if (response.ok) {
+          const data = await response.json();
+          const userEval = data.cp / 100; // Convert centipawns to pawns
+          const userMate = data.mate;
+          
+          // Update eval bar with the user's move evaluation
+          hideEvalLoading();
+          updateEvalBar(userEval, userMate);
+          
+          // If the move is correct, add visual feedback
+          if (isCorrect) {
+            setTimeout(() => {
+              // Briefly highlight the eval bar in green
+              evalLabel.style.transition = "background-color 0.3s";
+              evalLabel.style.backgroundColor = "#d4edda";
+              setTimeout(() => {
+                evalLabel.style.backgroundColor = "";
+              }, 500);
+            }, 100);
+          }
+        } else {
+          // Fallback: if evaluation fails, show the expected eval for correct moves
+          hideEvalLoading();
+          if (isCorrect) {
+            updateEvalBar(evalAfter, mateAfter);
+          }
+          console.error("Failed to evaluate position");
+        }
+      } catch (error) {
+        console.error("Error evaluating position:", error);
+        // Fallback behavior
+        hideEvalLoading();
+        if (isCorrect) {
+          updateEvalBar(evalAfter, mateAfter);
+        }
+      }
+      
       revealResult(isCorrect, played);
     }
 
