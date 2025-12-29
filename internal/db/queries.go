@@ -168,6 +168,91 @@ ON CONFLICT(chess_com_id) DO UPDATE SET
 	return id, err
 }
 
+// InsertGamesBatch inserts multiple games within a single transaction.
+// It returns the IDs of newly inserted games (existing games are skipped).
+func (db *DB) InsertGamesBatch(ctx context.Context, games []models.Game) ([]int64, error) {
+	log := logger.FromContext(ctx).WithPrefix("db")
+	log.Debug("batch inserting %d games", len(games))
+
+	if len(games) == 0 {
+		return nil, nil
+	}
+
+	var insertedIDs []int64
+	err := tx(ctx, db, func(tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, `
+INSERT INTO games (
+    profile_id, chess_com_id, pgn, time_class, result, played_as,
+    opponent, played_at, eco_code, opening_name, opening_url, analysis_status
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(chess_com_id) DO NOTHING
+`)
+		if err != nil {
+			log.Error("failed to prepare batch insert: %v", err)
+			return err
+		}
+		defer stmt.Close()
+
+		for _, g := range games {
+			res, err := stmt.ExecContext(ctx, g.ProfileID, g.ChessComID, g.PGN, g.TimeClass, g.Result, g.PlayedAs, g.Opponent, g.PlayedAt, g.ECOCode, g.OpeningName, g.OpeningURL, g.AnalysisStatus)
+			if err != nil {
+				log.Error("failed to insert game chess_com_id=%s: %v", g.ChessComID, err)
+				return err
+			}
+			if id, err := res.LastInsertId(); err == nil && id != 0 {
+				insertedIDs = append(insertedIDs, id)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug("batch insert completed, %d new games inserted", len(insertedIDs))
+	return insertedIDs, nil
+}
+
+// GetExistingChessComIDs returns a set of chess.com IDs already stored for the profile.
+func (db *DB) GetExistingChessComIDs(ctx context.Context, profileID int64) (map[string]bool, error) {
+	log := logger.FromContext(ctx).WithPrefix("db")
+	log.Debug("loading existing chess_com_ids for profile_id=%d", profileID)
+
+	rows, err := db.QueryContext(ctx, `SELECT chess_com_id FROM games WHERE profile_id = ?`, profileID)
+	if err != nil {
+		log.Error("failed to list chess_com_ids: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			log.Error("failed to scan chess_com_id: %v", err)
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// UpdateGameOpening updates ECO/opening fields for a game.
+func (db *DB) UpdateGameOpening(ctx context.Context, id int64, ecoCode, openingName string) error {
+	log := logger.FromContext(ctx).WithPrefix("db")
+	log.Debug("updating game opening: game_id=%d, eco=%s, opening=%s", id, ecoCode, openingName)
+
+	_, err := db.ExecContext(ctx, `
+UPDATE games
+SET eco_code = ?, opening_name = ?
+WHERE id = ?
+`, ecoCode, openingName, id)
+	if err != nil {
+		log.Error("failed to update game opening: %v", err)
+	}
+	return err
+}
+
 func (db *DB) ListGames(ctx context.Context, filter models.GameFilter) ([]models.Game, error) {
 	log := logger.FromContext(ctx).WithPrefix("db")
 	log.Debug("listing games with filter: profile_id=%d, time_class=%s, result=%s, opening=%s",

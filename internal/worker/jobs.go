@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -75,6 +76,21 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		return err
 	}
 	chessGame := chess.NewGame(pgnOpt)
+
+	// Detect opening if missing
+	if game.OpeningName == "" {
+		book := opening.NewBookECO()
+		foundOpening := book.Find(chessGame.Moves())
+		if foundOpening != nil {
+			game.ECOCode = foundOpening.Code()
+			game.OpeningName = foundOpening.Title()
+			if err := j.DB.UpdateGameOpening(ctx, game.ID, game.ECOCode, game.OpeningName); err != nil {
+				log.Warn("failed to update game opening: %v", err)
+			} else {
+				log.Debug("updated opening to %s (%s)", game.OpeningName, game.ECOCode)
+			}
+		}
+	}
 
 	positions := chessGame.Positions()
 	moves := chessGame.Moves()
@@ -215,6 +231,11 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		return err
 	}
 
+	if j.Profile.LastSyncAt != nil {
+		archives = filterArchivesByDate(archives, *j.Profile.LastSyncAt)
+		log.Info("filtered archives to %d based on last_sync_at", len(archives))
+	}
+
 	// ArchiveLimit of 0 means fetch all archives
 	if j.ArchiveLimit > 0 && len(archives) > j.ArchiveLimit {
 		archives = archives[len(archives)-j.ArchiveLimit:]
@@ -258,6 +279,13 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		close(results)
 	}()
 
+	existingIDs, err := j.DB.GetExistingChessComIDs(ctx, j.Profile.ID)
+	if err != nil {
+		log.Warn("failed to load existing game ids: %v", err)
+		existingIDs = map[string]bool{}
+	}
+
+	var monthlyGames []chesscom.MonthlyGame
 	var totalGames int
 	for res := range results {
 		if ctx.Err() != nil {
@@ -269,61 +297,50 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 			continue
 		}
 
-		for _, mg := range res.games {
-			gameMeta := parsePGNHeadersLocal(mg.PGN)
-			playedAs, opponent, result := deriveResultLocal(strings.ToLower(j.Profile.Username), mg)
-
-			// Try to identify opening using ECO book from actual moves
-			ecoCode := gameMeta["ECO"]
-			openingName := gameMeta["Opening"]
-
-			// Parse PGN using chess for opening detection
-			pgn, err := chess.PGN(strings.NewReader(mg.PGN))
-			if err == nil {
-				game := chess.NewGame(pgn)
-				book := opening.NewBookECO()
-				foundOpening := book.Find(game.Moves())
-				if foundOpening != nil {
-					ecoCode = foundOpening.Code()
-					openingName = foundOpening.Title()
-					log.Debug("identified opening: %s (%s) for game %s", openingName, ecoCode, extractGameIDLocal(mg.URL))
-				}
-			} else {
-				log.Debug("failed to parse PGN for opening detection, using headers: %v", err)
-			}
-
-			game := models.Game{
-				ProfileID:      j.Profile.ID,
-				ChessComID:     extractGameIDLocal(mg.URL),
-				PGN:            mg.PGN,
-				TimeClass:      mg.TimeClass,
-				Result:         result,
-				PlayedAs:       playedAs,
-				Opponent:       opponent,
-				PlayedAt:       time.Unix(mg.EndTime, 0),
-				ECOCode:        ecoCode,
-				OpeningName:    openingName,
-				OpeningURL:     gameMeta["ECOUrl"],
-				AnalysisStatus: "pending",
-			}
-
-			gameID, err := j.DB.InsertGame(ctx, game)
-			if err != nil {
-				log.Warn("failed to insert game chess_com_id=%s: %v", game.ChessComID, err)
-				continue
-			}
-
-			j.AnalysisPool.Submit(&AnalyzeGameJob{
-				DB:             j.DB,
-				GameID:         gameID,
-				StockfishPath:  j.StockfishPath,
-				StockfishDepth: j.StockfishDepth,
-			})
-			totalGames++
-		}
+		monthlyGames = append(monthlyGames, res.games...)
 	}
 
-	log.Info("imported %d games and queued for analysis", totalGames)
+	if len(monthlyGames) == 0 {
+		log.Info("no monthly games fetched")
+		return nil
+	}
+
+	var newGames []models.Game
+	for _, mg := range monthlyGames {
+		gameID := extractGameIDLocal(mg.URL)
+		if existingIDs[gameID] {
+			continue
+		}
+		existingIDs[gameID] = true // avoid duplicates in batch
+
+		gameMeta := parsePGNHeadersLocal(mg.PGN)
+		playedAs, opponent, result := deriveResultLocal(strings.ToLower(j.Profile.Username), mg)
+
+		game := models.Game{
+			ProfileID:      j.Profile.ID,
+			ChessComID:     gameID,
+			PGN:            mg.PGN,
+			TimeClass:      mg.TimeClass,
+			Result:         result,
+			PlayedAs:       playedAs,
+			Opponent:       opponent,
+			PlayedAt:       time.Unix(mg.EndTime, 0),
+			ECOCode:        gameMeta["ECO"],
+			OpeningName:    gameMeta["Opening"],
+			OpeningURL:     gameMeta["ECOUrl"],
+			AnalysisStatus: "pending",
+		}
+		newGames = append(newGames, game)
+	}
+
+	inserted, err := j.DB.InsertGamesBatch(ctx, newGames)
+	if err != nil {
+		log.Error("failed to batch insert games: %v", err)
+		return err
+	}
+
+	totalGames = len(inserted)
+	log.Info("imported %d new games", totalGames)
 	if err := j.DB.UpdateProfileSync(ctx, j.Profile.ID, time.Now()); err != nil {
 		log.Warn("failed to update profile sync time: %v", err)
 	}
@@ -381,4 +398,35 @@ func normalizeResultLocal(res string) string {
 	default:
 		return "loss"
 	}
+}
+
+// filterArchivesByDate keeps archives from the given month/year onwards.
+// Archive URLs look like: https://api.chess.com/pub/player/{username}/games/YYYY/MM
+func filterArchivesByDate(archives []string, since time.Time) []string {
+	if since.IsZero() {
+		return archives
+	}
+	sinceMonth := time.Date(since.Year(), since.Month(), 1, 0, 0, 0, 0, time.UTC)
+
+	var filtered []string
+	for _, url := range archives {
+		parts := strings.Split(strings.TrimSuffix(url, "/"), "/")
+		if len(parts) < 2 {
+			continue
+		}
+		yearStr := parts[len(parts)-2]
+		monthStr := parts[len(parts)-1]
+
+		year, err1 := strconv.Atoi(yearStr)
+		monthInt, err2 := strconv.Atoi(monthStr)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		archiveMonth := time.Date(year, time.Month(monthInt), 1, 0, 0, 0, 0, time.UTC)
+		if archiveMonth.Before(sinceMonth) {
+			continue
+		}
+		filtered = append(filtered, url)
+	}
+	return filtered
 }
