@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/vytor/chessflash/internal/analysis"
 	"github.com/vytor/chessflash/internal/api"
 	"github.com/vytor/chessflash/internal/chesscom"
 	"github.com/vytor/chessflash/internal/config"
@@ -21,6 +23,13 @@ import (
 
 func main() {
 	cfg := config.Load()
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		// Use fmt.Printf since logger isn't initialized yet
+		fmt.Fprintf(os.Stderr, "invalid configuration:\n%v\n", err)
+		os.Exit(1)
+	}
 
 	// Initialize logger
 	log := logger.New(
@@ -65,6 +74,17 @@ func main() {
 	}
 	log.Debug("templates loaded successfully")
 
+	// Create engine pool
+	enginePool, err := analysis.NewEnginePool(cfg.StockfishPath, cfg.AnalysisWorkerCount)
+	if err != nil {
+		log.Error("failed to create engine pool: %v", err)
+		os.Exit(1)
+	}
+	defer func() {
+		log.Debug("closing engine pool")
+		enginePool.Close()
+	}()
+
 	// Initialize worker pools
 	analysisPool := worker.NewPool(cfg.AnalysisWorkerCount, cfg.AnalysisQueueSize)
 	importPool := worker.NewPool(cfg.ImportWorkerCount, cfg.ImportQueueSize)
@@ -79,7 +99,6 @@ func main() {
 	// Initialize services (order matters - analysisService needs to be created before jobQueue)
 	profileService := services.NewProfileService(profileRepo)
 	analysisConfig := services.AnalysisConfig{
-		StockfishPath:  cfg.StockfishPath,
 		StockfishDepth: cfg.StockfishDepth,
 	}
 	analysisService := services.NewAnalysisService(
@@ -88,6 +107,7 @@ func main() {
 		flashcardRepo,
 		statsRepo,
 		analysisConfig,
+		enginePool,
 	)
 	flashcardService := services.NewFlashcardService(flashcardRepo)
 	statsService := services.NewStatsService(statsRepo)

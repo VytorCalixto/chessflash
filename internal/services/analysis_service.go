@@ -26,6 +26,7 @@ type analysisService struct {
 	flashcardRepo  repository.FlashcardRepository
 	statsRepo      repository.StatsRepository
 	config         AnalysisConfig
+	pool           *analysis.EnginePool
 }
 
 // NewAnalysisService creates a new AnalysisService
@@ -35,6 +36,7 @@ func NewAnalysisService(
 	flashcardRepo repository.FlashcardRepository,
 	statsRepo repository.StatsRepository,
 	config AnalysisConfig,
+	pool *analysis.EnginePool,
 ) AnalysisService {
 	return &analysisService{
 		gameRepo:      gameRepo,
@@ -42,6 +44,7 @@ func NewAnalysisService(
 		flashcardRepo: flashcardRepo,
 		statsRepo:     statsRepo,
 		config:        config,
+		pool:          pool,
 	}
 }
 
@@ -59,20 +62,11 @@ func (s *analysisService) EvaluatePosition(ctx context.Context, fen string, stoc
 		depth = stockfishDepth
 	}
 
-	// Create a new Stockfish engine for this request
-	// Note: In production, you might want to use a pool of engines
-	sf, err := analysis.NewEngine(stockfishPath)
-	if err != nil {
-		log.Error("failed to initialize stockfish: %v", err)
-		return analysis.EvalResult{}, errors.NewInternalError(err)
-	}
-	defer sf.Close()
-
 	// Set timeout for evaluation
 	evalCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	result, err := sf.EvaluateFEN(evalCtx, fen, depth)
+	result, err := s.pool.Evaluate(evalCtx, fen, depth)
 	if err != nil {
 		log.Error("failed to evaluate position: %v", err)
 		return analysis.EvalResult{}, errors.NewInternalError(err)
@@ -112,14 +106,14 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		return err
 	}
 
-	log.Debug("initializing stockfish engine")
-	sf, err := analysis.NewEngine(s.config.StockfishPath)
+	log.Debug("acquiring stockfish engine from pool")
+	engine, err := s.pool.Acquire(ctx)
 	if err != nil {
-		log.Error("failed to initialize stockfish: %v", err)
+		log.Error("failed to acquire engine from pool: %v", err)
 		_ = s.gameRepo.UpdateStatus(ctx, gameID, "failed")
 		return err
 	}
-	defer sf.Close()
+	defer s.pool.Release(engine)
 
 	depth := s.config.StockfishDepth
 	if depth <= 0 {
@@ -186,12 +180,12 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		log.Debug("fen before: %s", fenBefore)
 		log.Debug("fen after: %s", fenAfter)
 
-		evalBefore, err := sf.EvaluateFEN(ctx, fenBefore, depth)
+		evalBefore, err := engine.EvaluateFEN(ctx, fenBefore, depth)
 		if err != nil {
 			log.Warn("eval before move %d failed: %v", i+1, err)
 			continue
 		}
-		evalAfter, err := sf.EvaluateFEN(ctx, fenAfter, depth)
+		evalAfter, err := engine.EvaluateFEN(ctx, fenAfter, depth)
 		if err != nil {
 			log.Warn("eval after move %d failed: %v", i+1, err)
 			continue

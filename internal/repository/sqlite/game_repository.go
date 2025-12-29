@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
 	"github.com/vytor/chessflash/internal/repository"
 )
+
+var sqlBuilder = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Question)
 
 type gameRepository struct {
 	db *sql.DB
@@ -47,38 +50,43 @@ func (r *gameRepository) List(ctx context.Context, filter models.GameFilter) ([]
 	log.Debug("listing games with filter: profile_id=%d, time_class=%s, result=%s, opening=%s, opponent=%s",
 		filter.ProfileID, filter.TimeClass, filter.Result, filter.OpeningName, filter.Opponent)
 
-	clauses := []string{}
-	args := []any{}
+	query := sqlBuilder.Select(
+		"id", "profile_id", "chess_com_id", "pgn", "time_class", "result", "played_as",
+		"opponent", "player_rating", "opponent_rating", "played_at", "eco_code",
+		"opening_name", "opening_url", "analysis_status", "created_at",
+	).From("games")
+
+	// Dynamic WHERE clauses
 	if filter.ProfileID != 0 {
-		clauses = append(clauses, "profile_id = ?")
-		args = append(args, filter.ProfileID)
+		query = query.Where(squirrel.Eq{"profile_id": filter.ProfileID})
 	}
 	if filter.TimeClass != "" {
-		clauses = append(clauses, "time_class = ?")
-		args = append(args, filter.TimeClass)
+		query = query.Where(squirrel.Eq{"time_class": filter.TimeClass})
 	}
 	if filter.Result != "" {
-		clauses = append(clauses, "result = ?")
-		args = append(args, filter.Result)
+		query = query.Where(squirrel.Eq{"result": filter.Result})
 	}
 	if filter.OpeningName != "" {
-		clauses = append(clauses, "opening_name = ?")
-		args = append(args, filter.OpeningName)
+		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
 	}
 	if filter.Opponent != "" {
-		clauses = append(clauses, "opponent = ?")
-		args = append(args, filter.Opponent)
+		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
 	}
-	where := whereParts(clauses)
 
+	// Safe ORDER BY with validation
 	orderBy := "played_at"
 	if filter.OrderBy == "played_at" {
 		orderBy = filter.OrderBy
 	}
 	orderDir := "DESC"
-	if filter.OrderDir == "ASC" || filter.OrderDir == "DESC" {
-		orderDir = filter.OrderDir
+	if filter.OrderDir == "ASC" {
+		orderDir = "ASC"
+	} else if filter.OrderDir == "DESC" {
+		orderDir = "DESC"
 	}
+	query = query.OrderBy(orderBy + " " + orderDir)
+
+	// Pagination
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 200
@@ -87,18 +95,15 @@ func (r *gameRepository) List(ctx context.Context, filter models.GameFilter) ([]
 	if offset < 0 {
 		offset = 0
 	}
+	query = query.Limit(uint64(limit)).Offset(uint64(offset))
 
-	query := `
-SELECT id, profile_id, chess_com_id, pgn, time_class, result, played_as, opponent, player_rating, opponent_rating, played_at,
-       eco_code, opening_name, opening_url, analysis_status, created_at
-FROM games
-` + where + `
-ORDER BY ` + orderBy + ` ` + orderDir + `
-LIMIT ? OFFSET ?
-`
-	args = append(args, limit, offset)
+	sql, args, err := query.ToSql()
+	if err != nil {
+		log.Error("failed to build query: %v", err)
+		return nil, err
+	}
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		log.Error("failed to list games: %v", err)
 		return nil, err
@@ -122,35 +127,33 @@ func (r *gameRepository) Count(ctx context.Context, filter models.GameFilter) (i
 	log.Debug("counting games with filter: profile_id=%d, time_class=%s, result=%s, opening=%s, opponent=%s",
 		filter.ProfileID, filter.TimeClass, filter.Result, filter.OpeningName, filter.Opponent)
 
-	clauses := []string{}
-	args := []any{}
+	query := sqlBuilder.Select("COUNT(*)").From("games")
+
+	// Same WHERE logic as List()
 	if filter.ProfileID != 0 {
-		clauses = append(clauses, "profile_id = ?")
-		args = append(args, filter.ProfileID)
+		query = query.Where(squirrel.Eq{"profile_id": filter.ProfileID})
 	}
 	if filter.TimeClass != "" {
-		clauses = append(clauses, "time_class = ?")
-		args = append(args, filter.TimeClass)
+		query = query.Where(squirrel.Eq{"time_class": filter.TimeClass})
 	}
 	if filter.Result != "" {
-		clauses = append(clauses, "result = ?")
-		args = append(args, filter.Result)
+		query = query.Where(squirrel.Eq{"result": filter.Result})
 	}
 	if filter.OpeningName != "" {
-		clauses = append(clauses, "opening_name = ?")
-		args = append(args, filter.OpeningName)
+		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
 	}
 	if filter.Opponent != "" {
-		clauses = append(clauses, "opponent = ?")
-		args = append(args, filter.Opponent)
+		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
 	}
-	where := whereParts(clauses)
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		log.Error("failed to build query: %v", err)
+		return 0, err
+	}
 
 	var count int
-	err := r.db.QueryRowContext(ctx, `
-SELECT COUNT(*)
-FROM games
-`+where, args...).Scan(&count)
+	err = r.db.QueryRowContext(ctx, sql, args...).Scan(&count)
 	if err != nil {
 		log.Error("failed to count games: %v", err)
 		return 0, err
@@ -351,4 +354,3 @@ func (r *gameRepository) GetExistingChessComIDs(ctx context.Context, profileID i
 	}
 	return out, rows.Err()
 }
-

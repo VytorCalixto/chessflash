@@ -16,9 +16,28 @@ function initBoard() {
     return;
   }
   
-  const cardData = JSON.parse(dataScript.textContent);
+  let cardData;
+  try {
+    cardData = JSON.parse(dataScript.textContent);
+  } catch (e) {
+    throw e;
+  }
   
-  const fen = cardData.fen;
+  // Defensive parsing: ensure FEN is a clean string (remove any extra quotes)
+  let fen = cardData.fen;
+  if (typeof fen === 'string') {
+    // Remove surrounding quotes if present (handles double-encoding)
+    fen = fen.replace(/^["']+|["']+$/g, '');
+    // Trim whitespace
+    fen = fen.trim();
+  }
+  
+  // Validate FEN format (should have at least 4 space-separated parts)
+  if (!fen || typeof fen !== 'string' || fen.split(' ').length < 4) {
+    console.error('Invalid FEN format:', fen);
+    return;
+  }
+  
   const bestMove = cardData.bestMove.trim();
   const mateBefore = cardData.mateBefore;
   const mateAfter = cardData.mateAfter;
@@ -51,7 +70,28 @@ function initBoard() {
   const attemptIndicator = document.getElementById("attempt-indicator");
   const attemptCountDisplay = document.getElementById("attempt-count-display");
 
-  const chess = new Chess(fen);
+  let chess;
+  try {
+    chess = new Chess(fen);
+    const loadedFen = chess.fen();
+    const isValid = loadedFen === fen || loadedFen.split(' ')[0] === fen.split(' ')[0];
+    
+    // Check if Chess.js actually loaded the FEN correctly
+    if (!isValid) {
+      console.error('Chess.js failed to load FEN correctly. Expected:', fen, 'Got:', loadedFen);
+      // Try to reload with the FEN directly
+      try {
+        chess.load(fen);
+      } catch (reloadErr) {
+        console.error('Failed to reload FEN:', reloadErr);
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to initialize Chess.js:', e);
+    return;
+  }
+  
   const initialFen = fen; // Store initial position for resetting after wrong moves
   const sideToMove = fen.split(" ")[1] === "w" ? "white" : "black";
   const maxAttempts = 3;
