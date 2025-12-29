@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -60,6 +61,7 @@ type Logger struct {
 	prefix   string
 	fields   map[string]any
 	colorize bool
+	format   string // "text" or "json"
 }
 
 // Option configures a Logger.
@@ -93,6 +95,13 @@ func WithColors(enabled bool) Option {
 	}
 }
 
+// WithFormat sets the output format ("text" or "json").
+func WithFormat(format string) Option {
+	return func(l *Logger) {
+		l.format = format
+	}
+}
+
 // New creates a new Logger with the given options.
 func New(opts ...Option) *Logger {
 	l := &Logger{
@@ -100,6 +109,7 @@ func New(opts ...Option) *Logger {
 		level:    INFO,
 		fields:   make(map[string]any),
 		colorize: true,
+		format:   "text",
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -133,6 +143,7 @@ func (l *Logger) WithField(key string, value any) *Logger {
 		prefix:   l.prefix,
 		fields:   newFields,
 		colorize: l.colorize,
+		format:   l.format,
 	}
 }
 
@@ -151,6 +162,7 @@ func (l *Logger) WithFields(fields map[string]any) *Logger {
 		prefix:   l.prefix,
 		fields:   newFields,
 		colorize: l.colorize,
+		format:   l.format,
 	}
 }
 
@@ -162,6 +174,7 @@ func (l *Logger) WithPrefix(prefix string) *Logger {
 		prefix:   prefix,
 		fields:   l.fields,
 		colorize: l.colorize,
+		format:   l.format,
 	}
 }
 
@@ -172,6 +185,11 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	if l.format == "json" {
+		l.logJSON(level, msg, args...)
+		return
+	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
 
@@ -237,6 +255,48 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 
 	sb.WriteString("\n")
 	fmt.Fprint(l.out, sb.String())
+}
+
+// logJSON outputs logs in JSON format for log aggregation systems.
+func (l *Logger) logJSON(level Level, msg string, args ...any) {
+	// Format message
+	formattedMsg := msg
+	if len(args) > 0 {
+		formattedMsg = fmt.Sprintf(msg, args...)
+	}
+
+	// Build JSON object
+	entry := map[string]any{
+		"timestamp": time.Now().Format(time.RFC3339Nano),
+		"level":     level.String(),
+		"message":   formattedMsg,
+	}
+
+	if l.prefix != "" {
+		entry["prefix"] = l.prefix
+	}
+
+	// Get caller info
+	_, file, line, ok := runtime.Caller(2)
+	if ok {
+		entry["caller"] = fmt.Sprintf("%s:%d", file, line)
+	}
+
+	// Add fields
+	if len(l.fields) > 0 {
+		for k, v := range l.fields {
+			entry[k] = v
+		}
+	}
+
+	// Use encoding/json for proper JSON encoding
+	jsonBytes, err := json.Marshal(entry)
+	if err != nil {
+		// Fallback to text format if JSON encoding fails
+		fmt.Fprintf(l.out, "%s [%s] %s\n", time.Now().Format("2006-01-02 15:04:05.000"), level.String(), formattedMsg)
+		return
+	}
+	fmt.Fprintln(l.out, string(jsonBytes))
 }
 
 func colorize(level Level) string {

@@ -95,6 +95,7 @@ func (r *flashcardRepository) FlashcardWithPosition(ctx context.Context, id int6
 
 	var fp models.FlashcardWithPosition
 	var prevMovePlayed sql.NullString
+	var playerRating, opponentRating sql.NullInt64
 	err := r.db.QueryRowContext(ctx, `
 SELECT 
     f.id, f.position_id, f.due_at, f.interval_days, f.ease_factor, f.times_reviewed, f.times_correct, f.created_at,
@@ -112,7 +113,7 @@ WHERE f.id = ? AND g.profile_id = ?
 `, id, profileID).Scan(&fp.ID, &fp.PositionID, &fp.DueAt, &fp.IntervalDays, &fp.EaseFactor, &fp.TimesReviewed, &fp.TimesCorrect, &fp.CreatedAt,
 		&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.MateBefore, &fp.MateAfter, &fp.Classification,
 		&fp.WhitePlayer, &fp.BlackPlayer, &prevMovePlayed,
-		&fp.PlayerRating, &fp.OpponentRating, &fp.PlayedAt, &fp.TimeClass)
+		&playerRating, &opponentRating, &fp.PlayedAt, &fp.TimeClass)
 	if errors.Is(err, sql.ErrNoRows) {
 		log.Debug("flashcard not found: id=%d", id)
 		return nil, nil
@@ -123,6 +124,12 @@ WHERE f.id = ? AND g.profile_id = ?
 	}
 	if prevMovePlayed.Valid {
 		fp.PrevMovePlayed = prevMovePlayed.String
+	}
+	if playerRating.Valid {
+		fp.PlayerRating = int(playerRating.Int64)
+	}
+	if opponentRating.Valid {
+		fp.OpponentRating = int(opponentRating.Int64)
 	}
 	log.Debug("flashcard found: position_id=%d, classification=%s", fp.PositionID, fp.Classification)
 	return &fp, nil

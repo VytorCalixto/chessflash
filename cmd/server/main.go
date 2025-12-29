@@ -119,18 +119,18 @@ func main() {
 	jobQueue := jobs.NewWorkerQueue(
 		analysisPool,
 		importPool,
-		database,
 		profileRepo,
+		gameRepo,
+		statsRepo,
 		analysisService,
 		chessClient,
 		cfg.StockfishPath,
 		cfg.StockfishDepth,
 		cfg.ArchiveLimit,
 		cfg.MaxConcurrentArchive,
-		gameRepo,
 	)
 
-	gameService := services.NewGameService(gameRepo, positionRepo, jobQueue, database)
+	gameService := services.NewGameService(gameRepo, positionRepo, jobQueue)
 	importService := services.NewImportService(jobQueue)
 
 	srv := &api.Server{

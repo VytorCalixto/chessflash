@@ -1,6 +1,28 @@
 package analysis
 
+// ClassificationThresholds defines the centipawn thresholds for move classification.
+type ClassificationThresholds struct {
+	BlunderCP    float64 // Default: 200
+	MistakeCP    float64 // Default: 100
+	InaccuracyCP float64 // Default: 50
+}
+
+// DefaultThresholds returns the standard classification thresholds.
+func DefaultThresholds() ClassificationThresholds {
+	return ClassificationThresholds{
+		BlunderCP:    200,
+		MistakeCP:    100,
+		InaccuracyCP: 50,
+	}
+}
+
+// ClassifyMove classifies a move using default thresholds.
 func ClassifyMove(evalBefore, evalAfter float64, isWhiteMove bool, movePlayed, bestMove string) string {
+	return ClassifyMoveWithThresholds(DefaultThresholds(), evalBefore, evalAfter, isWhiteMove, movePlayed, bestMove)
+}
+
+// ClassifyMoveWithThresholds classifies a move using custom thresholds.
+func ClassifyMoveWithThresholds(thresholds ClassificationThresholds, evalBefore, evalAfter float64, isWhiteMove bool, movePlayed, bestMove string) string {
 	// If the played move matches the best move, it's always "good"
 	// This prevents classifying best moves as mistakes/blunders in losing positions
 	if movePlayed != "" && bestMove != "" && movePlayed == bestMove {
@@ -21,11 +43,11 @@ func ClassifyMove(evalBefore, evalAfter float64, isWhiteMove bool, movePlayed, b
 	}
 
 	switch {
-	case loss > 200:
+	case loss > thresholds.BlunderCP:
 		return "blunder"
-	case loss > 100:
+	case loss > thresholds.MistakeCP:
 		return "mistake"
-	case loss > 50:
+	case loss > thresholds.InaccuracyCP:
 		return "inaccuracy"
 	default:
 		return "good"

@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/vytor/chessflash/internal/chesscom"
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
 	"github.com/vytor/chessflash/internal/pgn"
+	"github.com/vytor/chessflash/internal/repository"
 )
 
 type AnalyzeGameJob struct {
@@ -27,7 +27,9 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 
 // ImportGamesJob fetches recent archives, inserts games, and enqueues analysis.
 type ImportGamesJob struct {
-	DB             *db.DB
+	GameRepo       repository.GameRepository
+	ProfileRepo    repository.ProfileRepository
+	StatsRepo      repository.StatsRepository
 	ChessClient    *chesscom.Client
 	Profile        models.Profile
 	AnalysisPool   *Pool
@@ -100,7 +102,7 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		close(results)
 	}()
 
-	existingIDs, err := j.DB.GetExistingChessComIDs(ctx, j.Profile.ID)
+	existingIDs, err := j.GameRepo.GetExistingChessComIDs(ctx, j.Profile.ID)
 	if err != nil {
 		log.Warn("failed to load existing game ids: %v", err)
 		existingIDs = map[string]bool{}
@@ -183,7 +185,7 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		newGames = append(newGames, game)
 	}
 
-	inserted, err := j.DB.InsertGamesBatch(ctx, newGames)
+	inserted, err := j.GameRepo.InsertBatch(ctx, newGames)
 	if err != nil {
 		log.Error("failed to batch insert games: %v", err)
 		return err
@@ -191,11 +193,11 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 
 	totalGames = len(inserted)
 	log.Info("imported %d new games", totalGames)
-	if err := j.DB.UpdateProfileSync(ctx, j.Profile.ID, time.Now()); err != nil {
+	if err := j.ProfileRepo.UpdateSync(ctx, j.Profile.ID, time.Now()); err != nil {
 		log.Warn("failed to update profile sync time: %v", err)
 	}
 
-	if err := j.DB.RefreshProfileStats(ctx, j.Profile.ID); err != nil {
+	if err := j.StatsRepo.RefreshProfileStats(ctx, j.Profile.ID); err != nil {
 		log.Warn("failed to refresh cached stats after import: %v", err)
 	}
 	return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/jobs"
 	"github.com/vytor/chessflash/internal/logger"
@@ -31,16 +30,14 @@ type gameService struct {
 	gameRepo     repository.GameRepository
 	positionRepo repository.PositionRepository
 	jobQueue     jobs.JobQueue
-	db           *db.DB // Temporary: will be removed in Phase 4 when jobs use repositories
 }
 
 // NewGameService creates a new GameService
-func NewGameService(gameRepo repository.GameRepository, positionRepo repository.PositionRepository, jobQueue jobs.JobQueue, database *db.DB) GameService {
+func NewGameService(gameRepo repository.GameRepository, positionRepo repository.PositionRepository, jobQueue jobs.JobQueue) GameService {
 	return &gameService{
 		gameRepo:     gameRepo,
 		positionRepo: positionRepo,
 		jobQueue:     jobQueue,
-		db:           database,
 	}
 }
 

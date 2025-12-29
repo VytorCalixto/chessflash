@@ -9,6 +9,7 @@ import (
 func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 	r.Use(recoveryMiddleware)
+	r.Use(securityHeadersMiddleware)
 	r.Use(loggingMiddleware)
 	r.Use(s.profileMiddleware)
 
@@ -36,6 +37,10 @@ func (s *Server) Routes() http.Handler {
 	r.Post("/profiles", s.handleCreateProfile)
 	r.Post("/profiles/{id}/select", s.handleSelectProfile)
 	r.Post("/profiles/{id}/delete", s.handleDeleteProfile)
+
+	// Health check endpoints
+	r.Get("/health", s.handleHealth)
+	r.Get("/ready", s.handleReady)
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 	return r

@@ -24,7 +24,7 @@ func (s *Server) handleEvaluatePosition(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	result, err := s.AnalysisService.EvaluatePosition(r.Context(), fen, s.StockfishPath, s.StockfishDepth)
+	result, err := s.AnalysisService.EvaluatePosition(r.Context(), fen)
 	if err != nil {
 		handleError(w, r, err)
 		return

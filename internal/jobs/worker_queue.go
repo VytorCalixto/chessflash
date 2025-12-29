@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/vytor/chessflash/internal/chesscom"
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
 	"github.com/vytor/chessflash/internal/repository"
@@ -17,15 +16,15 @@ import (
 type WorkerQueue struct {
 	analysisPool    *worker.Pool
 	importPool      *worker.Pool
-	db              *db.DB
 	profileRepo     repository.ProfileRepository
+	gameRepo        repository.GameRepository
+	statsRepo       repository.StatsRepository
 	analysisService worker.AnalysisServiceInterface
 	chessClient     *chesscom.Client
 	stockfishPath   string
 	stockfishDepth  int
 	archiveLimit    int
 	maxConcurrent   int
-	gameRepo        repository.GameRepository
 
 	// Backfill mechanism
 	backfillMu      sync.Mutex
@@ -39,28 +38,28 @@ type WorkerQueue struct {
 func NewWorkerQueue(
 	analysisPool *worker.Pool,
 	importPool *worker.Pool,
-	db *db.DB,
 	profileRepo repository.ProfileRepository,
+	gameRepo repository.GameRepository,
+	statsRepo repository.StatsRepository,
 	analysisService worker.AnalysisServiceInterface,
 	chessClient *chesscom.Client,
 	stockfishPath string,
 	stockfishDepth int,
 	archiveLimit int,
 	maxConcurrent int,
-	gameRepo repository.GameRepository,
 ) JobQueue {
 	return &WorkerQueue{
 		analysisPool:    analysisPool,
 		importPool:      importPool,
-		db:              db,
 		profileRepo:     profileRepo,
+		gameRepo:        gameRepo,
+		statsRepo:       statsRepo,
 		analysisService: analysisService,
 		chessClient:     chessClient,
 		stockfishPath:   stockfishPath,
 		stockfishDepth:  stockfishDepth,
 		archiveLimit:    archiveLimit,
 		maxConcurrent:   maxConcurrent,
-		gameRepo:        gameRepo,
 	}
 }
 
@@ -91,7 +90,9 @@ func (q *WorkerQueue) EnqueueImport(profileID int64, username string) error {
 	}
 
 	err = q.importPool.Submit(&worker.ImportGamesJob{
-		DB:             q.db,
+		GameRepo:       q.gameRepo,
+		ProfileRepo:    q.profileRepo,
+		StatsRepo:      q.statsRepo,
 		ChessClient:    q.chessClient,
 		Profile:        *profile,
 		AnalysisPool:   q.analysisPool,

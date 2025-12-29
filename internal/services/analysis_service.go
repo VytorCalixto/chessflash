@@ -17,7 +17,7 @@ import (
 
 // AnalysisService handles position analysis business logic
 type AnalysisService interface {
-	EvaluatePosition(ctx context.Context, fen string, stockfishPath string, stockfishDepth int) (analysis.EvalResult, error)
+	EvaluatePosition(ctx context.Context, fen string) (analysis.EvalResult, error)
 	AnalyzeGame(ctx context.Context, gameID int64) error
 }
 
@@ -49,9 +49,9 @@ func NewAnalysisService(
 	}
 }
 
-func (s *analysisService) EvaluatePosition(ctx context.Context, fen string, stockfishPath string, stockfishDepth int) (analysis.EvalResult, error) {
+func (s *analysisService) EvaluatePosition(ctx context.Context, fen string) (analysis.EvalResult, error) {
 	log := logger.FromContext(ctx)
-	log.Debug("evaluating position: fen=%s, depth=%d", fen, stockfishDepth)
+	log.Debug("evaluating position: fen=%s", fen)
 
 	if fen == "" {
 		return analysis.EvalResult{}, errors.NewValidationError("fen", "cannot be empty")
@@ -59,8 +59,8 @@ func (s *analysisService) EvaluatePosition(ctx context.Context, fen string, stoc
 
 	// Use a lighter depth for real-time evaluation (faster response)
 	depth := 15
-	if stockfishDepth > 0 && stockfishDepth < 15 {
-		depth = stockfishDepth
+	if s.config.StockfishDepth > 0 && s.config.StockfishDepth < 15 {
+		depth = s.config.StockfishDepth
 	}
 
 	// Use shorter time for real-time evaluation

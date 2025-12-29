@@ -17,6 +17,73 @@ type gameRepository struct {
 	db *sql.DB
 }
 
+// applyAnalysisFilter applies common filter conditions from AnalysisFilter to a query builder.
+// This helper reduces duplication across GamesForAnalysis, CountGamesForAnalysis, and CountGamesByStatusWithFilter.
+func applyAnalysisFilter(query squirrel.SelectBuilder, filter models.AnalysisFilter, includeStatusFilter bool) squirrel.SelectBuilder {
+	// Profile ID is required
+	query = query.Where(squirrel.Eq{"profile_id": filter.ProfileID})
+
+	// Analysis status filter (only if not already filtered by specific status)
+	if includeStatusFilter {
+		statusFilter := []string{"pending", "failed"}
+		if filter.IncludeFailed {
+			statusFilter = append(statusFilter, "processing")
+		}
+		placeholders := make([]interface{}, len(statusFilter))
+		for i, status := range statusFilter {
+			placeholders[i] = status
+		}
+		query = query.Where(squirrel.Expr("analysis_status IN ("+squirrel.Placeholders(len(statusFilter))+")", placeholders...))
+	}
+
+	// Time class filter (support multiple)
+	if len(filter.TimeClasses) > 0 {
+		placeholders := make([]interface{}, len(filter.TimeClasses))
+		for i, tc := range filter.TimeClasses {
+			placeholders[i] = tc
+		}
+		query = query.Where(squirrel.Expr("time_class IN ("+squirrel.Placeholders(len(filter.TimeClasses))+")", placeholders...))
+	}
+
+	// Result filter
+	if filter.Result != "" {
+		query = query.Where(squirrel.Eq{"result": filter.Result})
+	}
+
+	// Opponent filter
+	if filter.Opponent != "" {
+		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
+	}
+
+	// Opening filter
+	if filter.OpeningName != "" {
+		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
+	}
+
+	// Date range filter
+	if filter.StartDate != nil {
+		query = query.Where(squirrel.GtOrEq{"played_at": *filter.StartDate})
+	}
+	if filter.EndDate != nil {
+		query = query.Where(squirrel.LtOrEq{"played_at": *filter.EndDate})
+	}
+
+	// Rating range filter
+	if filter.MinRating > 0 {
+		query = query.Where(squirrel.GtOrEq{"player_rating": filter.MinRating})
+	}
+	if filter.MaxRating > 0 {
+		query = query.Where(squirrel.LtOrEq{"player_rating": filter.MaxRating})
+	}
+
+	// Color filter
+	if filter.PlayedAs != "" {
+		query = query.Where(squirrel.Eq{"played_as": filter.PlayedAs})
+	}
+
+	return query
+}
+
 // NewGameRepository creates a new GameRepository implementation
 func NewGameRepository(db *sql.DB) repository.GameRepository {
 	return &gameRepository{db: db}
@@ -416,65 +483,7 @@ func (r *gameRepository) GamesForAnalysis(ctx context.Context, filter models.Ana
 		"opening_name", "opening_url", "analysis_status", "created_at",
 	).From("games")
 
-	// Profile ID is required
-	query = query.Where(squirrel.Eq{"profile_id": filter.ProfileID})
-
-	// Analysis status filter
-	statusFilter := []string{"pending", "failed"}
-	if filter.IncludeFailed {
-		statusFilter = append(statusFilter, "processing")
-	}
-	// Build IN clause for status filter
-	placeholders := make([]interface{}, len(statusFilter))
-	for i, status := range statusFilter {
-		placeholders[i] = status
-	}
-	query = query.Where(squirrel.Expr("analysis_status IN ("+squirrel.Placeholders(len(statusFilter))+")", placeholders...))
-
-	// Time class filter (support multiple)
-	if len(filter.TimeClasses) > 0 {
-		placeholders := make([]interface{}, len(filter.TimeClasses))
-		for i, tc := range filter.TimeClasses {
-			placeholders[i] = tc
-		}
-		query = query.Where(squirrel.Expr("time_class IN ("+squirrel.Placeholders(len(filter.TimeClasses))+")", placeholders...))
-	}
-
-	// Result filter
-	if filter.Result != "" {
-		query = query.Where(squirrel.Eq{"result": filter.Result})
-	}
-
-	// Opponent filter
-	if filter.Opponent != "" {
-		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
-	}
-
-	// Opening filter
-	if filter.OpeningName != "" {
-		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
-	}
-
-	// Date range filter
-	if filter.StartDate != nil {
-		query = query.Where(squirrel.GtOrEq{"played_at": *filter.StartDate})
-	}
-	if filter.EndDate != nil {
-		query = query.Where(squirrel.LtOrEq{"played_at": *filter.EndDate})
-	}
-
-	// Rating range filter
-	if filter.MinRating > 0 {
-		query = query.Where(squirrel.GtOrEq{"player_rating": filter.MinRating})
-	}
-	if filter.MaxRating > 0 {
-		query = query.Where(squirrel.LtOrEq{"player_rating": filter.MaxRating})
-	}
-
-	// Color filter
-	if filter.PlayedAs != "" {
-		query = query.Where(squirrel.Eq{"played_as": filter.PlayedAs})
-	}
+	query = applyAnalysisFilter(query, filter, true)
 
 	// Always order by played_at DESC (latest first)
 	query = query.OrderBy("played_at DESC")
@@ -517,65 +526,7 @@ func (r *gameRepository) CountGamesForAnalysis(ctx context.Context, filter model
 
 	query := sqlBuilder.Select("COUNT(*)").From("games")
 
-	// Profile ID is required
-	query = query.Where(squirrel.Eq{"profile_id": filter.ProfileID})
-
-	// Analysis status filter
-	statusFilter := []string{"pending", "failed"}
-	if filter.IncludeFailed {
-		statusFilter = append(statusFilter, "processing")
-	}
-	// Build IN clause for status filter
-	placeholders := make([]interface{}, len(statusFilter))
-	for i, status := range statusFilter {
-		placeholders[i] = status
-	}
-	query = query.Where(squirrel.Expr("analysis_status IN ("+squirrel.Placeholders(len(statusFilter))+")", placeholders...))
-
-	// Time class filter (support multiple)
-	if len(filter.TimeClasses) > 0 {
-		placeholders := make([]interface{}, len(filter.TimeClasses))
-		for i, tc := range filter.TimeClasses {
-			placeholders[i] = tc
-		}
-		query = query.Where(squirrel.Expr("time_class IN ("+squirrel.Placeholders(len(filter.TimeClasses))+")", placeholders...))
-	}
-
-	// Result filter
-	if filter.Result != "" {
-		query = query.Where(squirrel.Eq{"result": filter.Result})
-	}
-
-	// Opponent filter
-	if filter.Opponent != "" {
-		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
-	}
-
-	// Opening filter
-	if filter.OpeningName != "" {
-		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
-	}
-
-	// Date range filter
-	if filter.StartDate != nil {
-		query = query.Where(squirrel.GtOrEq{"played_at": *filter.StartDate})
-	}
-	if filter.EndDate != nil {
-		query = query.Where(squirrel.LtOrEq{"played_at": *filter.EndDate})
-	}
-
-	// Rating range filter
-	if filter.MinRating > 0 {
-		query = query.Where(squirrel.GtOrEq{"player_rating": filter.MinRating})
-	}
-	if filter.MaxRating > 0 {
-		query = query.Where(squirrel.LtOrEq{"player_rating": filter.MaxRating})
-	}
-
-	// Color filter
-	if filter.PlayedAs != "" {
-		query = query.Where(squirrel.Eq{"played_as": filter.PlayedAs})
-	}
+	query = applyAnalysisFilter(query, filter, true)
 
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -599,56 +550,12 @@ func (r *gameRepository) CountGamesByStatusWithFilter(ctx context.Context, profi
 
 	query := sqlBuilder.Select("COUNT(*)").From("games")
 
-	// Profile ID is required
+	// Profile ID and status filter
 	query = query.Where(squirrel.Eq{"profile_id": profileID})
-
-	// Status filter - specific status
 	query = query.Where(squirrel.Eq{"analysis_status": status})
 
-	// Time class filter (support multiple)
-	if len(filter.TimeClasses) > 0 {
-		placeholders := make([]interface{}, len(filter.TimeClasses))
-		for i, tc := range filter.TimeClasses {
-			placeholders[i] = tc
-		}
-		query = query.Where(squirrel.Expr("time_class IN ("+squirrel.Placeholders(len(filter.TimeClasses))+")", placeholders...))
-	}
-
-	// Result filter
-	if filter.Result != "" {
-		query = query.Where(squirrel.Eq{"result": filter.Result})
-	}
-
-	// Opponent filter
-	if filter.Opponent != "" {
-		query = query.Where(squirrel.Eq{"opponent": filter.Opponent})
-	}
-
-	// Opening filter
-	if filter.OpeningName != "" {
-		query = query.Where(squirrel.Eq{"opening_name": filter.OpeningName})
-	}
-
-	// Date range filter
-	if filter.StartDate != nil {
-		query = query.Where(squirrel.GtOrEq{"played_at": *filter.StartDate})
-	}
-	if filter.EndDate != nil {
-		query = query.Where(squirrel.LtOrEq{"played_at": *filter.EndDate})
-	}
-
-	// Rating range filter
-	if filter.MinRating > 0 {
-		query = query.Where(squirrel.GtOrEq{"player_rating": filter.MinRating})
-	}
-	if filter.MaxRating > 0 {
-		query = query.Where(squirrel.LtOrEq{"player_rating": filter.MaxRating})
-	}
-
-	// Color filter
-	if filter.PlayedAs != "" {
-		query = query.Where(squirrel.Eq{"played_as": filter.PlayedAs})
-	}
+	// Apply other filters (excluding status filter since we already filtered by specific status)
+	query = applyAnalysisFilter(query, filter, false)
 
 	sql, args, err := query.ToSql()
 	if err != nil {

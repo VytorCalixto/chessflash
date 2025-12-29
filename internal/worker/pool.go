@@ -56,6 +56,12 @@ func (p *Pool) Start(ctx context.Context) {
 	p.stopped = false
 	p.log.Info("starting worker pool with %d workers", p.workers)
 
+	p.spawnWorkers(ctx)
+}
+
+// spawnWorkers creates and starts worker goroutines.
+// This helper reduces duplication between Start() and Restart().
+func (p *Pool) spawnWorkers(ctx context.Context) {
 	for i := 0; i < p.workers; i++ {
 		p.wg.Add(1)
 		go func(id int) {
@@ -161,40 +167,7 @@ func (p *Pool) Restart(ctx context.Context) {
 	p.stopped = false
 	p.log.Info("restarting worker pool with %d workers", p.workers)
 
-	for i := 0; i < p.workers; i++ {
-		p.wg.Add(1)
-		go func(id int) {
-			defer p.wg.Done()
-			workerLog := p.log.WithField("worker_id", id)
-			workerLog.Debug("worker started")
-
-			for {
-				select {
-				case <-ctx.Done():
-					workerLog.Debug("worker shutting down (context cancelled)")
-					return
-				case job := <-p.jobs:
-					if job == nil {
-						workerLog.Debug("worker shutting down (nil job received)")
-						return
-					}
-
-					jobLog := workerLog.WithField("job", job.Name())
-					jobLog.Debug("starting job")
-					start := time.Now()
-
-					// Create a context with the logger for the job
-					jobCtx := logger.NewContext(ctx, jobLog)
-
-					if err := job.Run(jobCtx); err != nil {
-						jobLog.Error("job failed after %v: %v", time.Since(start), err)
-					} else {
-						jobLog.Info("job completed in %v", time.Since(start))
-					}
-				}
-			}
-		}(i + 1)
-	}
+	p.spawnWorkers(ctx)
 }
 
 var ErrPoolStopped = errors.New("worker pool is stopped")

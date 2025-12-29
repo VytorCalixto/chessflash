@@ -103,10 +103,13 @@ func clearProfileCookie(w http.ResponseWriter) {
 
 func setProfileCookie(w http.ResponseWriter, id int64) {
 	http.SetCookie(w, &http.Cookie{
-		Name:    profileCookieName,
-		Value:   strconv.FormatInt(id, 10),
-		Path:    "/",
-		Expires: time.Now().Add(30 * 24 * time.Hour),
+		Name:     profileCookieName,
+		Value:    strconv.FormatInt(id, 10),
+		Path:     "/",
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		// Secure: true when behind HTTPS (set via environment/config)
 	})
 }
 
@@ -183,4 +186,21 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// securityHeadersMiddleware adds security headers to responses.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// timeoutMiddleware wraps a handler with a timeout.
+func timeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.TimeoutHandler(next, timeout, "Request timeout")
+	}
 }
