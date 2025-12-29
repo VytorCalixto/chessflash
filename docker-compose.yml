@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  chessflash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        STOCKFISH_BINARY_PATH: stockfish-ubuntu-x86-64-avx2/stockfish/stockfish-ubuntu-x86-64-avx2
+    container_name: chessflash
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=file:/data/chessflash.db
+      - STOCKFISH_PATH=/usr/local/bin/stockfish
+      - ADDR=:8080
+    restart: unless-stopped

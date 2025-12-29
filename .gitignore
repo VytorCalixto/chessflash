@@ -4,3 +4,4 @@ stockfish-ubuntu-x86-64-avx2
 *.txt
 *.db
 *.db-*
+data/
