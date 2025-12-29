@@ -33,9 +33,6 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		log.Error("failed to get game: %v", err)
 		return err
 	}
-	if game.Opponent != "haugustf" {
-		return nil
-	}
 
 	if game.AnalysisStatus == "completed" {
 		log.Debug("game already analyzed, skipping")
@@ -101,6 +98,9 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 			return ctx.Err()
 		}
 
+		// Determine whose turn it is to move (i even = white, i odd = black)
+		isWhiteMove := i%2 == 0
+
 		posBefore := positions[i]
 		posAfter := positions[i+1]
 
@@ -125,9 +125,6 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		log.Debug("evalBefore: %+v", evalBefore)
 		log.Debug("evalAfter: %+v", evalAfter)
 
-		// Determine whose turn it is to move (i even = white, i odd = black)
-		isWhiteMove := i%2 == 0
-
 		// Only create flashcards for moves made by the user (i even -> white, i odd -> black)
 		isPlayerMove := isWhiteMove == userIsWhite
 		if !isPlayerMove {
@@ -149,7 +146,7 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		posID, err := j.DB.InsertPosition(ctx, models.Position{
 			GameID:         game.ID,
 			MoveNumber:     i + 1,
-			FEN:            fenAfter,
+			FEN:            fenBefore,
 			MovePlayed:     moves[i].String(),
 			BestMove:       evalBefore.BestMove,
 			EvalBefore:     evalBefore.CP,

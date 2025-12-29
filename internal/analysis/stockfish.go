@@ -135,6 +135,11 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 		log.Error("failed to set position: %v", err)
 		return EvalResult{}, err
 	}
+
+	// Parse FEN to determine whose turn it is
+	parts := strings.Fields(fen)
+	isBlackToMove := len(parts) > 1 && parts[1] == "b"
+
 	if err := e.sendLocked(fmt.Sprintf("go depth %d", depth)); err != nil {
 		log.Error("failed to start analysis: %v", err)
 		return EvalResult{}, err
@@ -159,7 +164,12 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "info") {
 			if cp, ok := parseCP(line); ok {
-				best.CP = cp
+				// Normalize to white's perspective
+				if isBlackToMove {
+					best.CP = -cp
+				} else {
+					best.CP = cp
+				}
 			}
 		}
 		if strings.HasPrefix(line, "bestmove") {
