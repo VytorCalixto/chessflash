@@ -218,6 +218,10 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 		log.Error("failed to update game status to completed: %v", err)
 	}
 
+	if err := j.DB.RefreshProfileStats(ctx, game.ProfileID); err != nil {
+		log.Warn("failed to refresh cached stats: %v", err)
+	}
+
 	return nil
 }
 
@@ -333,6 +337,33 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		gameMeta := parsePGNHeadersLocal(mg.PGN)
 		playedAs, opponent, result := deriveResultLocal(strings.ToLower(j.Profile.Username), mg)
 
+		// Extract ratings from PGN headers (best effort).
+		var playerRating, opponentRating int
+		if playedAs == "white" {
+			playerRating, _ = strconv.Atoi(gameMeta["WhiteElo"])
+			opponentRating, _ = strconv.Atoi(gameMeta["BlackElo"])
+		} else {
+			playerRating, _ = strconv.Atoi(gameMeta["BlackElo"])
+			opponentRating, _ = strconv.Atoi(gameMeta["WhiteElo"])
+		}
+		if playerRating == 0 || opponentRating == 0 {
+			if playedAs == "white" {
+				if playerRating == 0 {
+					playerRating = mg.White.Rating
+				}
+				if opponentRating == 0 {
+					opponentRating = mg.Black.Rating
+				}
+			} else {
+				if playerRating == 0 {
+					playerRating = mg.Black.Rating
+				}
+				if opponentRating == 0 {
+					opponentRating = mg.White.Rating
+				}
+			}
+		}
+
 		game := models.Game{
 			ProfileID:      j.Profile.ID,
 			ChessComID:     gameID,
@@ -341,6 +372,8 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 			Result:         result,
 			PlayedAs:       playedAs,
 			Opponent:       opponent,
+			PlayerRating:   playerRating,
+			OpponentRating: opponentRating,
 			PlayedAt:       time.Unix(mg.EndTime, 0),
 			ECOCode:        gameMeta["ECO"],
 			OpeningName:    gameMeta["Opening"],
@@ -360,6 +393,10 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 	log.Info("imported %d new games", totalGames)
 	if err := j.DB.UpdateProfileSync(ctx, j.Profile.ID, time.Now()); err != nil {
 		log.Warn("failed to update profile sync time: %v", err)
+	}
+
+	if err := j.DB.RefreshProfileStats(ctx, j.Profile.ID); err != nil {
+		log.Warn("failed to refresh cached stats after import: %v", err)
 	}
 	return nil
 }

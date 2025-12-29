@@ -3,9 +3,9 @@ package models
 import "time"
 
 type Profile struct {
-	ID        int64      `json:"id"`
-	Username  string     `json:"username"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID         int64      `json:"id"`
+	Username   string     `json:"username"`
+	CreatedAt  time.Time  `json:"created_at"`
 	LastSyncAt *time.Time `json:"last_sync_at"`
 }
 
@@ -18,6 +18,8 @@ type Game struct {
 	Result         string    `json:"result"`
 	PlayedAs       string    `json:"played_as"`
 	Opponent       string    `json:"opponent"`
+	PlayerRating   int       `json:"player_rating"`
+	OpponentRating int       `json:"opponent_rating"`
 	PlayedAt       time.Time `json:"played_at"`
 	ECOCode        string    `json:"eco_code"`
 	OpeningName    string    `json:"opening_name"`
@@ -31,6 +33,7 @@ type GameFilter struct {
 	TimeClass   string
 	Result      string
 	OpeningName string
+	Opponent    string
 	Limit       int
 	Offset      int
 	OrderBy     string
@@ -38,19 +41,19 @@ type GameFilter struct {
 }
 
 type Position struct {
-	ID            int64     `json:"id"`
-	GameID        int64     `json:"game_id"`
-	MoveNumber    int       `json:"move_number"`
-	FEN           string    `json:"fen"`
-	MovePlayed    string    `json:"move_played"`
-	BestMove      string    `json:"best_move"`
-	EvalBefore    float64   `json:"eval_before"`
-	EvalAfter     float64   `json:"eval_after"`
-	EvalDiff      float64   `json:"eval_diff"`
-	MateBefore    *int      `json:"mate_before"`
-	MateAfter     *int      `json:"mate_after"`
-	Classification string   `json:"classification"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	GameID         int64     `json:"game_id"`
+	MoveNumber     int       `json:"move_number"`
+	FEN            string    `json:"fen"`
+	MovePlayed     string    `json:"move_played"`
+	BestMove       string    `json:"best_move"`
+	EvalBefore     float64   `json:"eval_before"`
+	EvalAfter      float64   `json:"eval_after"`
+	EvalDiff       float64   `json:"eval_diff"`
+	MateBefore     *int      `json:"mate_before"`
+	MateAfter      *int      `json:"mate_after"`
+	Classification string    `json:"classification"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Flashcard struct {
@@ -92,3 +95,63 @@ type OpeningStat struct {
 	AvgBlunders float64 `json:"avg_blunders"`
 }
 
+type OpponentStat struct {
+	Opponent          string    `json:"opponent"`
+	TotalGames        int       `json:"total_games"`
+	Wins              int       `json:"wins"`
+	Draws             int       `json:"draws"`
+	Losses            int       `json:"losses"`
+	WinRate           float64   `json:"win_rate"`
+	AvgOpponentRating float64   `json:"avg_opponent_rating"`
+	LastPlayedAt      time.Time `json:"last_played_at"`
+}
+
+type TimeClassStat struct {
+	TimeClass     string  `json:"time_class"`
+	TotalGames    int     `json:"total_games"`
+	Wins          int     `json:"wins"`
+	Draws         int     `json:"draws"`
+	Losses        int     `json:"losses"`
+	WinRate       float64 `json:"win_rate"`
+	AvgBlunders   float64 `json:"avg_blunders"`
+	AvgGameLength float64 `json:"avg_game_length"`
+}
+
+type ColorStat struct {
+	PlayedAs    string  `json:"played_as"`
+	TotalGames  int     `json:"total_games"`
+	Wins        int     `json:"wins"`
+	Draws       int     `json:"draws"`
+	Losses      int     `json:"losses"`
+	WinRate     float64 `json:"win_rate"`
+	AvgBlunders float64 `json:"avg_blunders"`
+}
+
+type MonthlyStat struct {
+	YearMonth     string  `json:"year_month"`
+	TotalGames    int     `json:"total_games"`
+	Wins          int     `json:"wins"`
+	Draws         int     `json:"draws"`
+	Losses        int     `json:"losses"`
+	WinRate       float64 `json:"win_rate"`
+	TotalBlunders int     `json:"total_blunders"`
+	BlunderRate   float64 `json:"blunder_rate"`
+	AvgRating     float64 `json:"avg_rating"`
+}
+
+type MistakePhaseStat struct {
+	Phase          string  `json:"phase"`
+	Classification string  `json:"classification"`
+	Count          int     `json:"count"`
+	AvgEvalLoss    float64 `json:"avg_eval_loss"`
+}
+
+type RatingStat struct {
+	TimeClass     string  `json:"time_class"`
+	MinRating     int     `json:"min_rating"`
+	MaxRating     int     `json:"max_rating"`
+	AvgRating     float64 `json:"avg_rating"`
+	CurrentRating int     `json:"current_rating"`
+	RatingChange  int     `json:"rating_change"`
+	GamesTracked  int     `json:"games_tracked"`
+}

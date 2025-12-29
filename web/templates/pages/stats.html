@@ -1,0 +1,179 @@
+{{define "pages/stats.html"}}
+{{template "head" .}}
+<div class="level">
+  <div class="level-left">
+    <div class="level-item">
+      <h1 class="title is-4">Statistics dashboard</h1>
+    </div>
+  </div>
+  <div class="level-right">
+    <div class="level-item">
+      <form method="POST" action="/analytics/refresh" style="display: inline;">
+        <input type="hidden" name="redirect" value="/stats">
+        <button type="submit" class="button is-small">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.425A6 6 0 1 1 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+          </span>
+          <span>Refresh</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+<p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
+
+<h2 class="title is-5 mt-4">Time control performance</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Time class</th>
+      <th>Games</th>
+      <th>W</th>
+      <th>D</th>
+      <th>L</th>
+      <th>Win %</th>
+      <th>Avg blunders</th>
+      <th>Avg moves</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .time_stats}}
+    <tr>
+      <td>{{.TimeClass}}</td>
+      <td>{{.TotalGames}}</td>
+      <td>{{.Wins}}</td>
+      <td>{{.Draws}}</td>
+      <td>{{.Losses}}</td>
+      <td>{{printf "%.1f" .WinRate}}</td>
+      <td>{{printf "%.2f" .AvgBlunders}}</td>
+      <td>{{printf "%.1f" .AvgGameLength}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="8">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-4">Color performance</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Played as</th>
+      <th>Games</th>
+      <th>W</th>
+      <th>D</th>
+      <th>L</th>
+      <th>Win %</th>
+      <th>Avg blunders</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .color_stats}}
+    <tr>
+      <td>{{.PlayedAs}}</td>
+      <td>{{.TotalGames}}</td>
+      <td>{{.Wins}}</td>
+      <td>{{.Draws}}</td>
+      <td>{{.Losses}}</td>
+      <td>{{printf "%.1f" .WinRate}}</td>
+      <td>{{printf "%.2f" .AvgBlunders}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="7">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-4">Monthly trend</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th>Games</th>
+      <th>W</th>
+      <th>D</th>
+      <th>L</th>
+      <th>Win %</th>
+      <th>Total blunders</th>
+      <th>Blunders/game</th>
+      <th>Avg rating</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .monthly_stats}}
+    <tr>
+      <td>{{.YearMonth}}</td>
+      <td>{{.TotalGames}}</td>
+      <td>{{.Wins}}</td>
+      <td>{{.Draws}}</td>
+      <td>{{.Losses}}</td>
+      <td>{{printf "%.1f" .WinRate}}</td>
+      <td>{{.TotalBlunders}}</td>
+      <td>{{printf "%.2f" .BlunderRate}}</td>
+      <td>{{printf "%.0f" .AvgRating}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="9">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-4">Mistake patterns by phase</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Classification</th>
+      <th>Count</th>
+      <th>Avg eval loss</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .mistake_stats}}
+    <tr>
+      <td>{{.Phase}}</td>
+      <td>{{.Classification}}</td>
+      <td>{{.Count}}</td>
+      <td>{{printf "%.1f" .AvgEvalLoss}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="4">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<h2 class="title is-5 mt-4">Rating progression</h2>
+<table class="table is-striped is-fullwidth">
+  <thead>
+    <tr>
+      <th>Time class</th>
+      <th>Games with rating</th>
+      <th>Min</th>
+      <th>Max</th>
+      <th>Avg</th>
+      <th>Current</th>
+      <th>Change</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .rating_stats}}
+    <tr>
+      <td>{{.TimeClass}}</td>
+      <td>{{.GamesTracked}}</td>
+      <td>{{.MinRating}}</td>
+      <td>{{.MaxRating}}</td>
+      <td>{{printf "%.0f" .AvgRating}}</td>
+      <td>{{.CurrentRating}}</td>
+      <td>{{.RatingChange}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="7">No data yet.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{template "foot" .}}
+{{end}}

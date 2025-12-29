@@ -1,15 +1,15 @@
-{{define "pages/openings.html"}}
+{{define "pages/opponents.html"}}
 {{template "head" .}}
 <div class="level">
   <div class="level-left">
     <div class="level-item">
-      <h1 class="title is-4">Opening statistics</h1>
+      <h1 class="title is-4">Opponent statistics</h1>
     </div>
   </div>
   <div class="level-right">
     <div class="level-item">
       <form method="POST" action="/analytics/refresh" style="display: inline;">
-        <input type="hidden" name="redirect" value="/openings">
+        <input type="hidden" name="redirect" value="/opponents">
         <button type="submit" class="button is-small">
           <span class="icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -26,7 +26,7 @@
 <p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
 
 <div class="block">
-  <form class="columns is-multiline" method="get" action="/openings">
+  <form class="columns is-multiline" method="get" action="/opponents">
     <div class="column is-one-quarter">
       <label class="label">Per page</label>
       <div class="select is-fullwidth">
@@ -38,35 +38,47 @@
       </div>
     </div>
     <input type="hidden" name="page" value="1">
+    <input type="hidden" name="order_by" value="{{.order_by}}">
+    <input type="hidden" name="order_dir" value="{{.order_dir}}">
   </form>
 </div>
 
-{{$queryBase := printf "per_page=%d" .per_page}}
+{{$nextDir := "ASC"}}
+{{if eq .order_dir "ASC"}}{{$nextDir = "DESC"}}{{end}}
+{{$queryBase := printf "per_page=%d&order_by=%s&order_dir=%s" .per_page .order_by .order_dir}}
 
 <table class="table is-striped is-fullwidth">
   <thead>
     <tr>
-      <th>Opening</th>
-      <th>ECO</th>
-      <th>Games</th>
+      <th>Opponent</th>
+      <th>
+        <a href="/opponents?page=1&order_by=total_games&order_dir={{$nextDir}}&per_page={{.per_page}}">
+          Games {{if and (eq .order_by "total_games") (eq .order_dir "ASC")}}▲{{else if and (eq .order_by "total_games") (eq .order_dir "DESC")}}▼{{end}}
+        </a>
+      </th>
       <th>W</th>
       <th>D</th>
       <th>L</th>
       <th>Win %</th>
-      <th>Avg blunders</th>
+      <th>Avg opponent rating</th>
+      <th>
+        <a href="/opponents?page=1&order_by=last_played_at&order_dir={{$nextDir}}&per_page={{.per_page}}">
+          Last played {{if and (eq .order_by "last_played_at") (eq .order_dir "ASC")}}▲{{else if and (eq .order_by "last_played_at") (eq .order_dir "DESC")}}▼{{end}}
+        </a>
+      </th>
     </tr>
   </thead>
   <tbody>
     {{range .stats}}
     <tr>
-      <td><a href="/games?opening={{urlquery .OpeningName}}">{{.OpeningName}}</a></td>
-      <td>{{.ECOCode}}</td>
+      <td><a href="/games?opponent={{urlquery .Opponent}}">{{.Opponent}}</a></td>
       <td>{{.TotalGames}}</td>
       <td>{{.Wins}}</td>
       <td>{{.Draws}}</td>
       <td>{{.Losses}}</td>
       <td>{{printf "%.1f" .WinRate}}</td>
-      <td>{{printf "%.2f" .AvgBlunders}}</td>
+      <td>{{if .AvgOpponentRating}}{{printf "%.0f" .AvgOpponentRating}}{{else}}-{{end}}</td>
+      <td>{{.LastPlayedAt}}</td>
     </tr>
     {{else}}
     <tr><td colspan="8">No data yet.</td></tr>
@@ -77,12 +89,12 @@
 {{if gt .total_pages 1}}
 <nav class="pagination is-centered" role="navigation" aria-label="pagination">
   {{if gt .page 1}}
-    <a class="pagination-previous" href="/openings?page={{sub .page 1}}&{{$queryBase}}">Previous</a>
+    <a class="pagination-previous" href="/opponents?page={{sub .page 1}}&{{$queryBase}}">Previous</a>
   {{else}}
     <a class="pagination-previous is-disabled" aria-disabled="true">Previous</a>
   {{end}}
   {{if lt .page .total_pages}}
-    <a class="pagination-next" href="/openings?page={{add .page 1}}&{{$queryBase}}">Next</a>
+    <a class="pagination-next" href="/opponents?page={{add .page 1}}&{{$queryBase}}">Next</a>
   {{else}}
     <a class="pagination-next is-disabled" aria-disabled="true">Next</a>
   {{end}}
@@ -100,20 +112,20 @@
       {{$end = .total_pages}}
     {{end}}
 
-    <li><a class="pagination-link {{if eq .page 1}}is-current{{end}}" aria-label="Go to page 1" href="/openings?page=1&{{$queryBase}}">1</a></li>
+    <li><a class="pagination-link {{if eq .page 1}}is-current{{end}}" aria-label="Go to page 1" href="/opponents?page=1&{{$queryBase}}">1</a></li>
     {{if gt $start 2}}
       <li><span class="pagination-ellipsis">&hellip;</span></li>
     {{end}}
 
     {{range $i := seq (max 2 $start) (min (sub $.total_pages 1) $end)}}
-      <li><a class="pagination-link {{if eq $.page $i}}is-current{{end}}" aria-label="Go to page {{$i}}" href="/openings?page={{$i}}&{{$queryBase}}">{{$i}}</a></li>
+      <li><a class="pagination-link {{if eq $.page $i}}is-current{{end}}" aria-label="Go to page {{$i}}" href="/opponents?page={{$i}}&{{$queryBase}}">{{$i}}</a></li>
     {{end}}
 
     {{if lt $end (sub .total_pages 1)}}
       <li><span class="pagination-ellipsis">&hellip;</span></li>
     {{end}}
     {{if gt .total_pages 1}}
-      <li><a class="pagination-link {{if eq .page .total_pages}}is-current{{end}}" aria-label="Go to page {{.total_pages}}" href="/openings?page={{.total_pages}}&{{$queryBase}}">{{.total_pages}}</a></li>
+      <li><a class="pagination-link {{if eq .page .total_pages}}is-current{{end}}" aria-label="Go to page {{.total_pages}}" href="/opponents?page={{.total_pages}}&{{$queryBase}}">{{.total_pages}}</a></li>
     {{end}}
   </ul>
 </nav>
@@ -121,4 +133,3 @@
 
 {{template "foot" .}}
 {{end}}
-

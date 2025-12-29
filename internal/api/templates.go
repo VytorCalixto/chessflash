@@ -44,6 +44,10 @@ func LoadTemplates() (*template.Template, error) {
 			}
 			return values.Get(key)
 		},
+		// urlquery URL-encodes a string
+		"urlquery": func(s string) string {
+			return url.QueryEscape(s)
+		},
 	}
 
 	t := template.New("base").Funcs(funcs)
@@ -64,4 +68,3 @@ func LoadTemplates() (*template.Template, error) {
 
 	return t, nil
 }
-

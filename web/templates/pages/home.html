@@ -1,27 +1,112 @@
 {{define "pages/home.html"}}
 {{template "head" .}}
-<div class="box">
-  <h1 class="title is-4">Import games for {{if .profile}}{{.profile.Username}}{{else}}your profile{{end}}</h1>
-  <form id="import-form" method="post" action="/import">
-    <div class="field">
-      <button class="button is-primary" type="submit">Import latest games</button>
-    </div>
-  </form>
-  <div class="mt-4"></div>
-  <form id="resume-form" method="post" action="/resume-analysis">
-    <div class="field is-grouped">
-      <p class="control">
+<h1 class="title is-4">Dashboard</h1>
+<p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
+
+<!-- Quick Actions Section -->
+<div class="box mb-5">
+  <h2 class="title is-5 mb-4">Quick Actions</h2>
+  <div class="field is-grouped">
+    <p class="control">
+      <form id="import-form" method="post" action="/import" style="display: inline;">
+        <button class="button is-primary" type="submit">Import latest games</button>
+      </form>
+    </p>
+    <p class="control">
+      <form id="resume-form" method="post" action="/resume-analysis" style="display: inline;">
         <button class="button is-link" type="submit">Resume analysis</button>
-      </p>
-      <p class="control">
-        <span class="tag is-light">Pending: {{.pending_count}}</span>
-      </p>
-    </div>
-  </form>
-  <p class="is-size-7 has-text-grey">
-    Need a different account? Use <a href="/profiles">Switch profile</a>.
-  </p>
+      </form>
+    </p>
+    <p class="control">
+      <form method="POST" action="/analytics/refresh" style="display: inline;">
+        <input type="hidden" name="redirect" value="/">
+        <button type="submit" class="button is-light">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.425A6 6 0 1 1 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+          </span>
+          <span>Refresh Stats</span>
+        </button>
+      </form>
+    </p>
+  </div>
 </div>
+
+<!-- Quick Stats Section -->
+{{if .total_games}}
+<div class="columns mb-5">
+  <div class="column">
+    <div class="box has-text-centered">
+      <p class="heading">Total Games</p>
+      <p class="title is-4">{{.total_games}}</p>
+    </div>
+  </div>
+  <div class="column">
+    <div class="box has-text-centered">
+      <p class="heading">Pending Analysis</p>
+      <p class="title is-4">{{.pending_count}}</p>
+    </div>
+  </div>
+  {{if .due_flashcards_count}}
+  <div class="column">
+    <div class="box has-text-centered">
+      <p class="heading">Due Flashcards</p>
+      <p class="title is-4">{{.due_flashcards_count}}</p>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+<!-- Feature Cards Section -->
+<h2 class="title is-5 mb-4">Features</h2>
+<div class="columns">
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h3 class="title is-5">Games</h3>
+        <p class="subtitle is-6 mb-4">Browse and filter your chess games</p>
+        <p class="mb-4">View all your imported games, filter by result, time control, or opening. Analyze individual games and review positions.</p>
+        {{if .total_games}}
+        <p class="mb-4"><strong>{{.total_games}}</strong> games imported</p>
+        {{end}}
+        <a href="/games" class="button is-link">View Games</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h3 class="title is-5">Analytics</h3>
+        <p class="subtitle is-6 mb-4">View opening stats, opponent records, and performance metrics</p>
+        <p class="mb-4">Explore your opening performance, head-to-head records against opponents, time control statistics, and detailed performance trends.</p>
+        <a href="/analytics" class="button is-link">View Analytics</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h3 class="title is-5">Flashcards</h3>
+        <p class="subtitle is-6 mb-4">Review positions from your mistakes and blunders</p>
+        <p class="mb-4">Practice with spaced repetition flashcards created from your blunders and mistakes. Improve your chess by reviewing critical positions.</p>
+        {{if .due_flashcards_count}}
+        <p class="mb-4"><strong>{{.due_flashcards_count}}</strong> flashcards due for review</p>
+        {{end}}
+        <a href="/flashcards" class="button is-link">View Flashcards</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="is-size-7 has-text-grey mt-5">
+  Need a different account? Use <a href="/profiles">Switch profile</a>.
+</p>
+
 <script>
 // #region agent log
 (function() {
@@ -46,4 +131,3 @@
 </script>
 {{template "foot" .}}
 {{end}}
-

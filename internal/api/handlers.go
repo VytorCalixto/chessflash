@@ -115,18 +115,34 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	log.Debug("rendering home page")
 	profile := profileFromContext(r.Context())
 
-	var pendingCount int
+	var pendingCount, totalGames, dueFlashcardsCount int
 	if profile != nil {
 		if count, err := s.DB.CountGamesNeedingAnalysis(r.Context(), profile.ID); err != nil {
 			log.Warn("failed to count pending games: %v", err)
 		} else {
 			pendingCount = count
 		}
+
+		// Get total games count
+		if count, err := s.DB.CountGames(r.Context(), models.GameFilter{ProfileID: profile.ID}); err != nil {
+			log.Warn("failed to count total games: %v", err)
+		} else {
+			totalGames = count
+		}
+
+		// Get due flashcards count (using a high limit to count all due)
+		if cards, err := s.DB.NextFlashcards(r.Context(), profile.ID, 10000); err != nil {
+			log.Warn("failed to count due flashcards: %v", err)
+		} else {
+			dueFlashcardsCount = len(cards)
+		}
 	}
 
 	s.render(w, r, "pages/home.html", pageData{
-		"profile":       profile,
-		"pending_count": pendingCount,
+		"profile":              profile,
+		"pending_count":        pendingCount,
+		"total_games":          totalGames,
+		"due_flashcards_count": dueFlashcardsCount,
 	})
 }
 
@@ -266,6 +282,7 @@ func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
 	result := r.URL.Query().Get("result")
 	timeClass := r.URL.Query().Get("time_class")
 	opening := r.URL.Query().Get("opening")
+	opponent := r.URL.Query().Get("opponent")
 	pageParam := r.URL.Query().Get("page")
 	perPageParam := r.URL.Query().Get("per_page")
 	orderBy := r.URL.Query().Get("order_by")
@@ -275,6 +292,7 @@ func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
 		"result":     result,
 		"time_class": timeClass,
 		"opening":    opening,
+		"opponent":   opponent,
 		"page":       pageParam,
 		"per_page":   perPageParam,
 		"order_by":   orderBy,
@@ -320,6 +338,7 @@ func (s *Server) handleGames(w http.ResponseWriter, r *http.Request) {
 		Result:      result,
 		TimeClass:   timeClass,
 		OpeningName: opening,
+		Opponent:    opponent,
 		Limit:       perPage,
 		Offset:      offset,
 		OrderBy:     orderBy,
@@ -502,21 +521,249 @@ func (s *Server) handleOpenings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log = log.WithField("username", profile.Username)
+	pageParam := r.URL.Query().Get("page")
+	perPageParam := r.URL.Query().Get("per_page")
+
+	page := 1
+	if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		page = p
+	}
+
+	perPage := 25
+	switch perPageParam {
+	case "10":
+		perPage = 10
+	case "25":
+		perPage = 25
+	case "50":
+		perPage = 50
+	case "100":
+		perPage = 100
+	}
+
+	offset := (page - 1) * perPage
+
+	log = log.WithFields(map[string]any{
+		"username": profile.Username,
+		"page":     page,
+		"per_page": perPage,
+	})
 	log.Debug("fetching opening stats")
 
-	stats, err := s.DB.OpeningStats(r.Context(), profile.ID)
+	stats, err := s.DB.OpeningStats(r.Context(), profile.ID, perPage, offset)
 	if err != nil {
 		log.Error("failed to get opening stats: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Debug("found %d opening stats", len(stats))
+	totalCount, err := s.DB.CountOpeningStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to count opening stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	totalPages := totalCount / perPage
+	if totalCount%perPage != 0 {
+		totalPages++
+	}
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	log.Debug("found %d opening stats (page %d of %d)", len(stats), page, totalPages)
 	s.render(w, r, "pages/openings.html", pageData{
-		"stats":   stats,
+		"stats":       stats,
+		"profile":     profile,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+		"total_count": totalCount,
+	})
+}
+
+func (s *Server) handleOpponents(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context, redirecting to /profiles")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	pageParam := r.URL.Query().Get("page")
+	perPageParam := r.URL.Query().Get("per_page")
+	orderBy := r.URL.Query().Get("order_by")
+	orderDir := strings.ToUpper(r.URL.Query().Get("order_dir"))
+
+	page := 1
+	if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		page = p
+	}
+
+	perPage := 25
+	switch perPageParam {
+	case "10":
+		perPage = 10
+	case "25":
+		perPage = 25
+	case "50":
+		perPage = 50
+	case "100":
+		perPage = 100
+	}
+
+	if orderBy != "total_games" && orderBy != "last_played_at" {
+		orderBy = "total_games"
+	}
+	if orderDir != "ASC" && orderDir != "DESC" {
+		orderDir = "DESC"
+	}
+
+	offset := (page - 1) * perPage
+
+	log = log.WithFields(map[string]any{
+		"username":  profile.Username,
+		"page":      page,
+		"per_page":  perPage,
+		"order_by":  orderBy,
+		"order_dir": orderDir,
+	})
+	log.Debug("fetching opponent stats")
+
+	stats, err := s.DB.OpponentStats(r.Context(), profile.ID, perPage, offset, orderBy, orderDir)
+	if err != nil {
+		log.Error("failed to get opponent stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	totalCount, err := s.DB.CountOpponentStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to count opponent stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	totalPages := totalCount / perPage
+	if totalCount%perPage != 0 {
+		totalPages++
+	}
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	log.Debug("found %d opponent stats (page %d of %d)", len(stats), page, totalPages)
+	s.render(w, r, "pages/opponents.html", pageData{
+		"stats":       stats,
+		"profile":     profile,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+		"total_count": totalCount,
+		"order_by":    orderBy,
+		"order_dir":   orderDir,
+	})
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context, redirecting to /profiles")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	log = log.WithField("username", profile.Username)
+	log.Debug("fetching aggregate stats")
+
+	timeStats, err := s.DB.TimeClassStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get time class stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	colorStats, err := s.DB.ColorStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get color stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	monthlyStats, err := s.DB.MonthlyStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get monthly stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	mistakeStats, err := s.DB.MistakePhaseStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get mistake phase stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ratingStats, err := s.DB.RatingStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Error("failed to get rating stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, r, "pages/stats.html", pageData{
+		"time_stats":    timeStats,
+		"color_stats":   colorStats,
+		"monthly_stats": monthlyStats,
+		"mistake_stats": mistakeStats,
+		"rating_stats":  ratingStats,
+		"profile":       profile,
+	})
+}
+
+func (s *Server) handleAnalytics(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context, redirecting to /profiles")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	log.Debug("rendering analytics hub page")
+	s.render(w, r, "pages/analytics.html", pageData{
 		"profile": profile,
 	})
+}
+
+func (s *Server) handleRefreshStats(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context during refresh")
+		http.Error(w, "no profile selected", http.StatusBadRequest)
+		return
+	}
+
+	log = log.WithField("profile_id", profile.ID)
+	log.Info("manually refreshing cached stats")
+
+	if err := s.DB.RefreshProfileStats(r.Context(), profile.ID); err != nil {
+		log.Error("failed to refresh stats: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("stats refreshed successfully")
+
+	// Redirect back to referrer or analytics page
+	redirectTo := r.FormValue("redirect")
+	if redirectTo == "" {
+		redirectTo = r.Header.Get("Referer")
+	}
+	if redirectTo == "" {
+		redirectTo = "/analytics"
+	}
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data pageData) {

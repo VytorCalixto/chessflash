@@ -1,0 +1,57 @@
+{{define "pages/analytics.html"}}
+{{template "head" .}}
+<h1 class="title is-4">Analytics Hub</h1>
+<p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
+
+<div class="mb-5">
+  <form method="POST" action="/analytics/refresh">
+    <input type="hidden" name="redirect" value="/analytics">
+    <button type="submit" class="button is-primary is-medium">
+      <span class="icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.425A6 6 0 1 1 8 2v1z"/>
+          <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+        </svg>
+      </span>
+      <span>Refresh All Statistics</span>
+    </button>
+  </form>
+  <p class="help mt-2">This will recompute all cached statistics from your games. This may take a moment.</p>
+</div>
+
+<div class="columns">
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h2 class="title is-5">Opening Statistics</h2>
+        <p class="subtitle is-6 mb-4">View your performance by chess opening</p>
+        <p class="mb-4">See which openings you play best, your win rates, and average blunders per opening. Track your ECO codes and opening names.</p>
+        <a href="/openings" class="button is-link">View Openings</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h2 class="title is-5">Opponent Statistics</h2>
+        <p class="subtitle is-6 mb-4">Track your head-to-head records</p>
+        <p class="mb-4">See your win/loss record against each opponent, average opponent ratings, and when you last played them.</p>
+        <a href="/opponents" class="button is-link">View Opponents</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="card">
+      <div class="card-content">
+        <h2 class="title is-5">Statistics Dashboard</h2>
+        <p class="subtitle is-6 mb-4">Comprehensive performance overview</p>
+        <p class="mb-4">View time control performance, color statistics, monthly trends, mistake patterns, and rating progression.</p>
+        <a href="/stats" class="button is-link">View Dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+{{template "foot" .}}
+{{end}}

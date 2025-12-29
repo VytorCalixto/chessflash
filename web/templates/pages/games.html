@@ -48,10 +48,12 @@
 {{$timeClass := getFilter .filters "time_class"}}
 {{$result := getFilter .filters "result"}}
 {{$opening := getFilter .filters "opening"}}
+{{$opponent := getFilter .filters "opponent"}}
 {{$queryBase := printf "per_page=%d&order_by=%s&order_dir=%s" .per_page .order_by .order_dir}}
 {{if $timeClass}}{{$queryBase = printf "%s&time_class=%s" $queryBase (urlquery $timeClass)}}{{end}}
 {{if $result}}{{$queryBase = printf "%s&result=%s" $queryBase (urlquery $result)}}{{end}}
 {{if $opening}}{{$queryBase = printf "%s&opening=%s" $queryBase (urlquery $opening)}}{{end}}
+{{if $opponent}}{{$queryBase = printf "%s&opponent=%s" $queryBase (urlquery $opponent)}}{{end}}
 
 <table class="table is-striped is-fullwidth">
   <thead>

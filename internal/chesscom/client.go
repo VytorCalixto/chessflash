@@ -38,6 +38,7 @@ type MonthlyGame struct {
 
 type Player struct {
 	Username string `json:"username"`
+	Rating   int    `json:"rating"`
 	Result   string `json:"result"`
 }
 
