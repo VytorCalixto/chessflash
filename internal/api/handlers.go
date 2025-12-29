@@ -14,6 +14,7 @@ type Server struct {
 	ProfileService       services.ProfileService
 	GameService          services.GameService
 	FlashcardService     services.FlashcardService
+	PuzzleRushService    services.PuzzleRushService
 	StatsService         services.StatsService
 	ImportService        services.ImportService
 	AnalysisService      services.AnalysisService

@@ -450,8 +450,7 @@
     cg = ChessgroundLib(boardEl, {
       fen: startFen,
       orientation,
-      draggable: { enabled: false },
-      movable: { enabled: false },
+      viewOnly: true,
       animation: { enabled: true }
     });
   }

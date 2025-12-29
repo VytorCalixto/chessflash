@@ -96,6 +96,7 @@ func main() {
 	flashcardRepo := sqlite.NewFlashcardRepository(database.DB)
 	profileRepo := sqlite.NewProfileRepository(database.DB)
 	statsRepo := sqlite.NewStatsRepository(database.DB)
+	puzzleRushRepo := sqlite.NewPuzzleRushRepository(database)
 
 	// Initialize services (order matters - analysisService needs to be created before jobQueue)
 	profileService := services.NewProfileService(profileRepo)
@@ -112,6 +113,7 @@ func main() {
 		enginePool,
 	)
 	flashcardService := services.NewFlashcardService(flashcardRepo)
+	puzzleRushService := services.NewPuzzleRushService(puzzleRushRepo, flashcardRepo, flashcardService)
 	statsService := services.NewStatsService(statsRepo)
 
 	// Initialize job queue
@@ -137,6 +139,7 @@ func main() {
 		ProfileService:       profileService,
 		GameService:          gameService,
 		FlashcardService:     flashcardService,
+		PuzzleRushService:    puzzleRushService,
 		StatsService:         statsService,
 		ImportService:        importService,
 		AnalysisService:      analysisService,

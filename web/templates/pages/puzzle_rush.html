@@ -1,0 +1,239 @@
+{{define "pages/puzzle_rush.html"}}
+{{template "head" .}}
+<style>
+  .difficulty-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .difficulty-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+  }
+  
+  /* Compact rush stats */
+  .rush-stats {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin: 0.75rem 0;
+  }
+  .stat-item {
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.75rem;
+    font-weight: bold;
+    color: #3273dc;
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
+  }
+  
+  /* Compact mistakes indicator */
+  .mistakes-indicator {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    margin: 0.5rem 0 0 0;
+  }
+  .mistake-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ddd;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  .mistake-dot.used {
+    background: #f14668;
+  }
+  
+  /* Compact stats box */
+  .rush-stats-box {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  /* Compact flashcard container */
+  #flashcard-container {
+    margin-top: 0.5rem;
+  }
+  
+  /* Compact game metadata card */
+  .rush-metadata-card {
+    margin-bottom: 0.75rem;
+  }
+  .rush-metadata-card .card-content {
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Compact title spacing */
+  .puzzle-rush-title {
+    margin-bottom: 1rem;
+  }
+  
+  .results-screen {
+    text-align: center;
+    padding: 2rem;
+  }
+  .final-score {
+    font-size: 4rem;
+    font-weight: bold;
+    color: #3273dc;
+    margin: 1rem 0;
+  }
+  .personal-best {
+    background: #ffd700;
+    color: #000;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin: 1rem 0;
+    font-weight: bold;
+  }
+  
+  /* Compact flashcard layout for rush */
+  .rush-flashcard-layout {
+    display: flex;
+    gap: 1rem;
+    align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  @media (max-width: 960px) {
+    .rush-flashcard-layout {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .rush-stats {
+      gap: 1rem;
+    }
+    .stat-value {
+      font-size: 1.5rem;
+    }
+  }
+</style>
+
+<h1 class="title is-4 puzzle-rush-title">Puzzle Rush</h1>
+
+<div id="selection-screen" class="{{if .currentSession}}is-hidden{{end}}">
+  <div class="content mb-4">
+    <p class="is-size-5">Test your chess knowledge! Answer as many flashcards correctly as possible before making mistakes.</p>
+  </div>
+
+  <div class="columns">
+    <div class="column">
+      <div class="card difficulty-card" data-difficulty="easy">
+        <div class="card-content">
+          <h3 class="title is-5">Easy</h3>
+          <p class="subtitle is-6">5 mistakes allowed</p>
+          <p>Perfect for beginners. Take your time and learn from each position.</p>
+        </div>
+      </div>
+    </div>
+    <div class="column">
+      <div class="card difficulty-card" data-difficulty="medium">
+        <div class="card-content">
+          <h3 class="title is-5">Medium</h3>
+          <p class="subtitle is-6">3 mistakes allowed</p>
+          <p>Challenge yourself with a moderate difficulty level.</p>
+        </div>
+      </div>
+    </div>
+    <div class="column">
+      <div class="card difficulty-card" data-difficulty="hard">
+        <div class="card-content">
+          <h3 class="title is-5">Hard</h3>
+          <p class="subtitle is-6">1 mistake allowed</p>
+          <p>Only for the most skilled. One wrong answer ends your run!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{if .stats}}
+  <div class="box mt-4">
+    <h3 class="title is-5 mb-3">Your Statistics</h3>
+    <div class="rush-stats">
+      <div class="stat-item">
+        <div class="stat-value">{{.stats.TotalAttempts}}</div>
+        <div class="stat-label">Total Attempts</div>
+      </div>
+      {{if .bestScores}}
+      {{range .bestScores}}
+      <div class="stat-item">
+        <div class="stat-value">{{.Score}}</div>
+        <div class="stat-label">Best ({{.Difficulty}})</div>
+      </div>
+      {{end}}
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<div id="active-rush-screen" class="{{if not .currentSession}}is-hidden{{end}}">
+  <div class="box rush-stats-box">
+    <div class="rush-stats">
+      <div class="stat-item">
+        <div class="stat-value" id="current-score">0</div>
+        <div class="stat-label">Score</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="time-elapsed">0:00</div>
+        <div class="stat-label">Time</div>
+      </div>
+    </div>
+    <div class="mistakes-indicator" id="mistakes-indicator">
+      <!-- Will be populated by JavaScript -->
+    </div>
+  </div>
+
+  <div id="flashcard-container">
+    <!-- Flashcard will be loaded here -->
+  </div>
+</div>
+
+<div id="results-screen" class="is-hidden">
+  <div class="results-screen">
+    <h2 class="title is-3">Rush Complete!</h2>
+    <div class="final-score" id="final-score">0</div>
+    <div id="personal-best-indicator" class="is-hidden">
+      <span class="personal-best">Personal Best!</span>
+    </div>
+    <p class="is-size-5 mt-4">You answered <strong id="final-correct">0</strong> flashcards correctly.</p>
+    <p class="is-size-6 mt-2">Time: <span id="final-time">0:00</span></p>
+    <div class="mt-5">
+      <button class="button is-primary" id="start-new-rush">Start New Rush</button>
+      <a class="button is-light ml-2" href="/puzzle-rush">Back to Menu</a>
+    </div>
+  </div>
+</div>
+
+<script id="rush-data" type="application/json">
+{{if .currentSession}}
+{
+  "session": {
+    "id": {{.currentSession.ID}},
+    "difficulty": "{{.currentSession.Difficulty}}",
+    "score": {{.currentSession.Score}},
+    "mistakes_made": {{.currentSession.MistakesMade}},
+    "mistakes_allowed": {{.currentSession.MistakesAllowed}},
+    "total_time_seconds": {{.currentSession.TotalTimeSeconds}}
+  }
+}
+{{else}}
+null
+{{end}}
+</script>
+
+<script type="module" src="/static/js/puzzle_rush/main.js"></script>
+
+{{template "foot" .}}
+{{end}}
