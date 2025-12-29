@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/corentings/chess"
+	"github.com/corentings/chess/v2"
+	"github.com/corentings/chess/v2/opening"
 	"github.com/vytor/chessflash/internal/analysis"
 	"github.com/vytor/chessflash/internal/chesscom"
 	"github.com/vytor/chessflash/internal/db"
@@ -214,19 +215,18 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		return err
 	}
 
-	limit := j.ArchiveLimit
-	if limit <= 0 {
-		limit = 6
+	// ArchiveLimit of 0 means fetch all archives
+	if j.ArchiveLimit > 0 && len(archives) > j.ArchiveLimit {
+		archives = archives[len(archives)-j.ArchiveLimit:]
+		log.Debug("limiting to last %d archives", j.ArchiveLimit)
 	}
-	if len(archives) > limit {
-		archives = archives[len(archives)-limit:]
-		log.Debug("limiting to last %d archives", limit)
-	}
+	log.Info("fetching %d archives in parallel", len(archives))
 
 	maxConc := j.MaxConcurrent
 	if maxConc <= 0 {
-		maxConc = 3
+		maxConc = 10
 	}
+	log.Debug("using %d concurrent workers for archive fetching", maxConc)
 
 	type archiveResult struct {
 		games []chesscom.MonthlyGame
@@ -273,6 +273,25 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 			gameMeta := parsePGNHeadersLocal(mg.PGN)
 			playedAs, opponent, result := deriveResultLocal(strings.ToLower(j.Profile.Username), mg)
 
+			// Try to identify opening using ECO book from actual moves
+			ecoCode := gameMeta["ECO"]
+			openingName := gameMeta["Opening"]
+
+			// Parse PGN using chess for opening detection
+			pgn, err := chess.PGN(strings.NewReader(mg.PGN))
+			if err == nil {
+				game := chess.NewGame(pgn)
+				book := opening.NewBookECO()
+				foundOpening := book.Find(game.Moves())
+				if foundOpening != nil {
+					ecoCode = foundOpening.Code()
+					openingName = foundOpening.Title()
+					log.Debug("identified opening: %s (%s) for game %s", openingName, ecoCode, extractGameIDLocal(mg.URL))
+				}
+			} else {
+				log.Debug("failed to parse PGN for opening detection, using headers: %v", err)
+			}
+
 			game := models.Game{
 				ProfileID:      j.Profile.ID,
 				ChessComID:     extractGameIDLocal(mg.URL),
@@ -282,8 +301,8 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 				PlayedAs:       playedAs,
 				Opponent:       opponent,
 				PlayedAt:       time.Unix(mg.EndTime, 0),
-				ECOCode:        gameMeta["ECO"],
-				OpeningName:    gameMeta["Opening"],
+				ECOCode:        ecoCode,
+				OpeningName:    openingName,
 				OpeningURL:     gameMeta["ECOUrl"],
 				AnalysisStatus: "pending",
 			}

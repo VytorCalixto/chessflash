@@ -16,14 +16,15 @@ import (
 )
 
 type Server struct {
-	DB             *db.DB
-	AnalysisPool   *worker.Pool
-	ImportPool     *worker.Pool
-	ChessClient    *chesscom.Client
-	Templates      *template.Template
-	StockfishPath  string
-	StockfishDepth int
-	ArchiveLimit   int
+	DB                   *db.DB
+	AnalysisPool         *worker.Pool
+	ImportPool           *worker.Pool
+	ChessClient          *chesscom.Client
+	Templates            *template.Template
+	StockfishPath        string
+	StockfishDepth       int
+	ArchiveLimit         int
+	MaxConcurrentArchive int
 }
 
 type pageData map[string]any
@@ -149,6 +150,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		StockfishPath:  s.StockfishPath,
 		StockfishDepth: s.StockfishDepth,
 		ArchiveLimit:   s.ArchiveLimit,
+		MaxConcurrent:  s.MaxConcurrentArchive,
 	}
 	s.ImportPool.Submit(job)
 	log.Info("import job queued")

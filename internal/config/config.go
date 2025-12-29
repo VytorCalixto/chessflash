@@ -9,16 +9,17 @@ import (
 )
 
 type Config struct {
-	Addr                string
-	DBPath              string
-	StockfishPath       string
-	StockfishDepth      int
-	LogLevel            string
-	AnalysisWorkerCount int
-	AnalysisQueueSize   int
-	ImportWorkerCount   int
-	ImportQueueSize     int
-	ArchiveLimit        int
+	Addr                   string
+	DBPath                 string
+	StockfishPath          string
+	StockfishDepth         int
+	LogLevel               string
+	AnalysisWorkerCount    int
+	AnalysisQueueSize      int
+	ImportWorkerCount      int
+	ImportQueueSize        int
+	ArchiveLimit           int
+	MaxConcurrentArchive   int
 }
 
 // Load reads configuration from a .env file (if present) and environment variables,
@@ -28,16 +29,17 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Addr:                envOr("ADDR", ":8080"),
-		DBPath:              envOr("DB_PATH", "file:chessflash.db"),
-		StockfishPath:       envOr("STOCKFISH_PATH", "stockfish"),
-		StockfishDepth:      envIntOr("STOCKFISH_DEPTH", 18),
-		LogLevel:            envOr("LOG_LEVEL", "INFO"),
-		AnalysisWorkerCount: envIntOr("ANALYSIS_WORKER_COUNT", 2),
-		AnalysisQueueSize:   envIntOr("ANALYSIS_QUEUE_SIZE", 64),
-		ImportWorkerCount:   envIntOr("IMPORT_WORKER_COUNT", 2),
-		ImportQueueSize:     envIntOr("IMPORT_QUEUE_SIZE", 32),
-		ArchiveLimit:        envIntOr("ARCHIVE_LIMIT", 6),
+		Addr:                   envOr("ADDR", ":8080"),
+		DBPath:                 envOr("DB_PATH", "file:chessflash.db"),
+		StockfishPath:          envOr("STOCKFISH_PATH", "stockfish"),
+		StockfishDepth:         envIntOr("STOCKFISH_DEPTH", 18),
+		LogLevel:               envOr("LOG_LEVEL", "INFO"),
+		AnalysisWorkerCount:    envIntOr("ANALYSIS_WORKER_COUNT", 2),
+		AnalysisQueueSize:      envIntOr("ANALYSIS_QUEUE_SIZE", 64),
+		ImportWorkerCount:      envIntOr("IMPORT_WORKER_COUNT", 2),
+		ImportQueueSize:        envIntOr("IMPORT_QUEUE_SIZE", 32),
+		ArchiveLimit:           envIntOr("ARCHIVE_LIMIT", 0),
+		MaxConcurrentArchive:   envIntOr("MAX_CONCURRENT_ARCHIVE", 10),
 	}
 }
 

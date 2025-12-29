@@ -131,7 +131,7 @@
     </div>
     <div class="board-area">
       <div class="eval-bar">
-        <div class="eval-label white-advantage" id="eval-label">+0.0</div>
+        <div class="eval-label white-advantage" id="eval-label" data-initial-eval="{{printf "%.2f" .card.EvalBefore}}">+0.0</div>
         <div class="eval-track">
           <div class="eval-fill" id="eval-fill"></div>
         </div>
@@ -174,9 +174,10 @@
   (function() {
     const fen = "{{.card.FEN}}";
     const bestMove = "{{.card.BestMove}}".trim();
-    const evalBefore = {{printf "%.2f" .card.EvalBefore}};
-    const evalAfter = {{printf "%.2f" .card.EvalAfter}};
-    const evalDiff = {{printf "%.2f" .card.EvalDiff}};
+    // Convert centipawns to pawns (divide by 100) and ensure they're numbers
+    const evalBefore = parseFloat({{printf "%.2f" .card.EvalBefore}}) / 100;
+    const evalAfter = parseFloat({{printf "%.2f" .card.EvalAfter}}) / 100;
+    const evalDiff = parseFloat({{printf "%.2f" .card.EvalDiff}}) / 100;
     const classification = "{{.card.Classification}}".toLowerCase();
     const movePlayed = "{{.card.MovePlayed}}";
     const whitePlayer = "{{.card.WhitePlayer}}";
@@ -222,13 +223,24 @@
     }
 
     function updateEvalBar(value) {
-      const clamped = clampEval(value);
+      // Ensure value is a number
+      const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      // Eval is always from white's perspective (white at top, black at bottom in eval bar)
+      const displayValue = numValue;
+      const clamped = clampEval(displayValue);
+      
+      // Reset eval bar to normal orientation (white at top, black at bottom)
+      const evalBar = evalFill.parentElement.parentElement;
+      evalBar.style.flexDirection = "column";
+      evalFill.style.top = "auto";
+      evalFill.style.bottom = "0";
+      
       const percent = ((clamped + 10) / 20) * 100;
       evalFill.style.height = percent + "%";
-      evalLabel.textContent = (value >= 0 ? "+" : "") + value.toFixed(1);
+      evalLabel.textContent = (displayValue >= 0 ? "+" : "") + displayValue.toFixed(1);
       
-      // Update label styling based on advantage
-      if (value >= 0) {
+      // Update label styling based on advantage (from white's perspective)
+      if (displayValue >= 0) {
         evalLabel.classList.remove("black-advantage");
         evalLabel.classList.add("white-advantage");
       } else {
@@ -287,6 +299,8 @@
 
       const played = moveToUci(move);
       const isCorrect = played === bestMove;
+      // Update eval bar to show eval after the move
+      updateEvalBar(evalAfter);
       revealResult(isCorrect, played);
     }
 
@@ -326,6 +340,7 @@
 
     // Initial UI state
     promptEl.textContent = contextualPrompt();
+    // Initialize eval bar immediately to avoid showing +0.0
     updateEvalBar(evalBefore);
     setupPlayerNames();
     _log("H3", "flashcards.js:ready", "ui ready", {});

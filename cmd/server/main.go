@@ -40,6 +40,7 @@ func main() {
 	log.Debug("import_worker_count=%d", cfg.ImportWorkerCount)
 	log.Debug("import_queue_size=%d", cfg.ImportQueueSize)
 	log.Debug("archive_limit=%d", cfg.ArchiveLimit)
+	log.Debug("max_concurrent_archive=%d", cfg.MaxConcurrentArchive)
 
 	// Open database
 	database, err := db.Open(cfg.DBPath)
@@ -65,14 +66,15 @@ func main() {
 	analysisPool := worker.NewPool(cfg.AnalysisWorkerCount, cfg.AnalysisQueueSize)
 	importPool := worker.NewPool(cfg.ImportWorkerCount, cfg.ImportQueueSize)
 	srv := &api.Server{
-		DB:             database,
-		AnalysisPool:   analysisPool,
-		ImportPool:     importPool,
-		ChessClient:    chesscom.New(),
-		Templates:      tmpl,
-		StockfishPath:  cfg.StockfishPath,
-		StockfishDepth: cfg.StockfishDepth,
-		ArchiveLimit:   cfg.ArchiveLimit,
+		DB:                   database,
+		AnalysisPool:         analysisPool,
+		ImportPool:           importPool,
+		ChessClient:          chesscom.New(),
+		Templates:            tmpl,
+		StockfishPath:        cfg.StockfishPath,
+		StockfishDepth:       cfg.StockfishDepth,
+		ArchiveLimit:         cfg.ArchiveLimit,
+		MaxConcurrentArchive: cfg.MaxConcurrentArchive,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
