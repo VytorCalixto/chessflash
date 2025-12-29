@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
+	"github.com/vytor/chessflash/internal/pgn"
 )
 
 type AnalyzeGameJob struct {
@@ -328,14 +328,14 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 
 	var newGames []models.Game
 	for _, mg := range monthlyGames {
-		gameID := extractGameIDLocal(mg.URL)
+		gameID := pgn.ExtractGameID(mg.URL)
 		if existingIDs[gameID] {
 			continue
 		}
 		existingIDs[gameID] = true // avoid duplicates in batch
 
-		gameMeta := parsePGNHeadersLocal(mg.PGN)
-		playedAs, opponent, result := deriveResultLocal(strings.ToLower(j.Profile.Username), mg)
+		gameMeta := pgn.ParsePGNHeaders(mg.PGN)
+		playedAs, opponent, result := chesscom.DeriveResult(strings.ToLower(j.Profile.Username), mg)
 
 		// Extract ratings from PGN headers (best effort).
 		var playerRating, opponentRating int
@@ -399,59 +399,6 @@ func (j *ImportGamesJob) Run(ctx context.Context) error {
 		log.Warn("failed to refresh cached stats after import: %v", err)
 	}
 	return nil
-}
-
-var headerReLocal = regexp.MustCompile(`\[(\w+)\s+"([^"]+)"\]`)
-
-func parsePGNHeadersLocal(pgn string) map[string]string {
-	out := map[string]string{}
-	for _, line := range strings.Split(pgn, "\n") {
-		if !strings.HasPrefix(line, "[") {
-			continue
-		}
-		m := headerReLocal.FindStringSubmatch(line)
-		if len(m) == 3 {
-			out[m[1]] = m[2]
-		}
-	}
-	return out
-}
-
-var gameIDReLocal = regexp.MustCompile(`.*/game/[^/]+/([0-9]+)`)
-
-func extractGameIDLocal(url string) string {
-	m := gameIDReLocal.FindStringSubmatch(url)
-	if len(m) == 2 {
-		return m[1]
-	}
-	return url
-}
-
-func deriveResultLocal(username string, mg chesscom.MonthlyGame) (playedAs, opponent, result string) {
-	if strings.EqualFold(mg.White.Username, username) {
-		playedAs = "white"
-		opponent = mg.Black.Username
-		result = normalizeResultLocal(mg.White.Result)
-		return
-	}
-	playedAs = "black"
-	opponent = mg.White.Username
-	result = normalizeResultLocal(mg.Black.Result)
-	return
-}
-
-func normalizeResultLocal(res string) string {
-	res = strings.ToLower(res)
-	switch res {
-	case "win":
-		return "win"
-	case "stalemate", "agreed", "repetition", "timevsinsufficient", "insufficient", "fiftymove", "draw":
-		return "draw"
-	case "checkmated", "resigned", "timeout", "abandoned", "kingofthehill", "threecheck", "bughousepartnerlose":
-		return "loss"
-	default:
-		return "loss"
-	}
 }
 
 // filterArchivesByDate keeps archives from the given month/year onwards.

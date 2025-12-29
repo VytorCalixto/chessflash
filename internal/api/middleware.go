@@ -72,10 +72,11 @@ func (s *Server) profileMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		profile, err := s.DB.GetProfile(r.Context(), profileID)
+		profile, err := s.ProfileService.GetProfile(r.Context(), profileID)
 		if err != nil {
 			log.Error("failed to load profile: %v", err)
-			http.Error(w, "failed to load profile", http.StatusInternalServerError)
+			clearProfileCookie(w)
+			http.Redirect(w, r, "/profiles", http.StatusSeeOther)
 			return
 		}
 		if profile == nil {

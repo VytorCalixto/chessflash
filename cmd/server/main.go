@@ -13,6 +13,7 @@ import (
 	"github.com/vytor/chessflash/internal/config"
 	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/logger"
+	"github.com/vytor/chessflash/internal/services"
 	"github.com/vytor/chessflash/internal/worker"
 )
 
@@ -65,8 +66,22 @@ func main() {
 	// Initialize worker pools
 	analysisPool := worker.NewPool(cfg.AnalysisWorkerCount, cfg.AnalysisQueueSize)
 	importPool := worker.NewPool(cfg.ImportWorkerCount, cfg.ImportQueueSize)
+
+	// Initialize services
+	profileService := services.NewProfileService(database)
+	gameService := services.NewGameService(database)
+	flashcardService := services.NewFlashcardService(database)
+	statsService := services.NewStatsService(database)
+	importService := services.NewImportService(database)
+	analysisService := services.NewAnalysisService()
+
 	srv := &api.Server{
-		DB:                   database,
+		ProfileService:       profileService,
+		GameService:          gameService,
+		FlashcardService:     flashcardService,
+		StatsService:         statsService,
+		ImportService:        importService,
+		AnalysisService:      analysisService,
 		AnalysisPool:         analysisPool,
 		ImportPool:           importPool,
 		ChessClient:          chesscom.New(),
