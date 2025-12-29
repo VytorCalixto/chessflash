@@ -468,9 +468,9 @@ func (db *DB) InsertPosition(ctx context.Context, p models.Position) (int64, err
 		p.GameID, p.MoveNumber, p.Classification)
 
 	res, err := db.ExecContext(ctx, `
-INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, classification)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-`, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.Classification)
+INSERT INTO positions (game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, p.GameID, p.MoveNumber, p.FEN, p.MovePlayed, p.BestMove, p.EvalBefore, p.EvalAfter, p.EvalDiff, p.MateBefore, p.MateAfter, p.Classification)
 	if err != nil {
 		log.Error("failed to insert position: %v", err)
 		return 0, err
@@ -489,7 +489,7 @@ func (db *DB) PositionsForGame(ctx context.Context, gameID int64) ([]models.Posi
 	log.Debug("fetching positions for game: game_id=%d", gameID)
 
 	rows, err := db.QueryContext(ctx, `
-SELECT id, game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, classification, created_at
+SELECT id, game_id, move_number, fen, move_played, best_move, eval_before, eval_after, eval_diff, mate_before, mate_after, classification, created_at
 FROM positions
 WHERE game_id = ?
 ORDER BY move_number ASC
@@ -502,7 +502,7 @@ ORDER BY move_number ASC
 	var positions []models.Position
 	for rows.Next() {
 		var p models.Position
-		if err := rows.Scan(&p.ID, &p.GameID, &p.MoveNumber, &p.FEN, &p.MovePlayed, &p.BestMove, &p.EvalBefore, &p.EvalAfter, &p.EvalDiff, &p.Classification, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.GameID, &p.MoveNumber, &p.FEN, &p.MovePlayed, &p.BestMove, &p.EvalBefore, &p.EvalAfter, &p.EvalDiff, &p.MateBefore, &p.MateAfter, &p.Classification, &p.CreatedAt); err != nil {
 			log.Error("failed to scan position row: %v", err)
 			return nil, err
 		}
@@ -619,7 +619,7 @@ func (db *DB) FlashcardWithPosition(ctx context.Context, id int64, profileID int
 	err := db.QueryRowContext(ctx, `
 SELECT 
     f.id, f.position_id, f.due_at, f.interval_days, f.ease_factor, f.times_reviewed, f.times_correct, f.created_at,
-    p.game_id, p.move_number, p.fen, p.move_played, p.best_move, p.eval_before, p.eval_after, p.eval_diff, p.classification,
+    p.game_id, p.move_number, p.fen, p.move_played, p.best_move, p.eval_before, p.eval_after, p.eval_diff, p.mate_before, p.mate_after, p.classification,
     CASE WHEN g.played_as = 'white' THEN pr.username ELSE g.opponent END AS white_player,
     CASE WHEN g.played_as = 'black' THEN pr.username ELSE g.opponent END AS black_player
 FROM flashcards f
@@ -628,7 +628,7 @@ JOIN games g ON g.id = p.game_id
 JOIN profiles pr ON pr.id = g.profile_id
 WHERE f.id = ? AND g.profile_id = ?
 `, id, profileID).Scan(&fp.ID, &fp.PositionID, &fp.DueAt, &fp.IntervalDays, &fp.EaseFactor, &fp.TimesReviewed, &fp.TimesCorrect, &fp.CreatedAt,
-		&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.Classification,
+		&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.MateBefore, &fp.MateAfter, &fp.Classification,
 		&fp.WhitePlayer, &fp.BlackPlayer)
 	if errors.Is(err, sql.ErrNoRows) {
 		log.Debug("flashcard not found: id=%d", id)

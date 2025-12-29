@@ -47,6 +47,8 @@ type Position struct {
 	EvalBefore    float64   `json:"eval_before"`
 	EvalAfter     float64   `json:"eval_after"`
 	EvalDiff      float64   `json:"eval_diff"`
+	MateBefore    *int      `json:"mate_before"`
+	MateAfter     *int      `json:"mate_after"`
 	Classification string   `json:"classification"`
 	CreatedAt     time.Time `json:"created_at"`
 }
@@ -72,6 +74,8 @@ type FlashcardWithPosition struct {
 	EvalBefore     float64 `json:"eval_before"`
 	EvalAfter      float64 `json:"eval_after"`
 	EvalDiff       float64 `json:"eval_diff"`
+	MateBefore     *int    `json:"mate_before"`
+	MateAfter      *int    `json:"mate_after"`
 	Classification string  `json:"classification"`
 	WhitePlayer    string  `json:"white_player"`
 	BlackPlayer    string  `json:"black_player"`

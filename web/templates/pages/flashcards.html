@@ -178,6 +178,10 @@
     function initBoard() {
     const fen = "{{.card.FEN}}";
     const bestMove = "{{.card.BestMove}}".trim();
+    // Mate fields (positive = white mates in N, negative = black mates in N)
+    const mateBefore = {{if .card.MateBefore}}{{.card.MateBefore}}{{else}}null{{end}};
+    const mateAfter = {{if .card.MateAfter}}{{.card.MateAfter}}{{else}}null{{end}};
+
     // Convert centipawns to pawns (divide by 100) and ensure they're numbers
     const evalBefore = parseFloat({{printf "%.2f" .card.EvalBefore}}) / 100;
     const evalAfter = parseFloat({{printf "%.2f" .card.EvalAfter}}) / 100;
@@ -242,7 +246,7 @@
       const played = moveToUci(move);
       const isCorrect = played === bestMove;
       // Update eval bar to show eval after the move
-      updateEvalBar(evalAfter);
+      updateEvalBar(evalAfter, mateAfter);
       revealResult(isCorrect, played);
     }
 
@@ -285,7 +289,21 @@
       return val;
     }
 
-    function updateEvalBar(value) {
+    function updateEvalBar(value, mate) {
+      if (mate !== null && mate !== undefined) {
+        const isWhiteMate = mate > 0;
+        const mateDisplay = Math.abs(mate);
+        evalFill.style.height = "100%";
+        evalLabel.textContent = (isWhiteMate ? "M" : "-M") + mateDisplay;
+        if (isWhiteMate) {
+          evalLabel.classList.remove("black-advantage");
+          evalLabel.classList.add("white-advantage");
+        } else {
+          evalLabel.classList.remove("white-advantage");
+          evalLabel.classList.add("black-advantage");
+        }
+        return;
+      }
       // Ensure value is a number
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
       // Eval is always from white's perspective (white at top, black at bottom in eval bar)
@@ -313,6 +331,9 @@
     }
 
     function contextualPrompt() {
+      if (mateBefore !== null && mateBefore !== undefined) {
+        return mateBefore > 0 ? "Find the fastest mate" : "Find the only move to avoid mate";
+      }
       if (evalBefore > 2) return "Find the move to keep your advantage";
       if (evalBefore > 0.5) return "Maintain the pressure with the best move";
       if (evalBefore < -2) return "Find the move to stay in the game";
@@ -341,7 +362,13 @@
         feedbackEl.textContent = `Not quite. The best move was ${bestMove}.`;
         feedbackEl.classList.remove("has-text-success");
         feedbackEl.classList.add("has-text-danger");
-        lossEl.textContent = `Your original move lost ${loss} pawns of advantage.`;
+        if (mateAfter !== null && mateAfter !== undefined) {
+          lossEl.textContent = mateAfter > 0
+            ? "Your move allows mate for White."
+            : "Your move allows mate for Black.";
+        } else {
+          lossEl.textContent = `Your original move lost ${loss} pawns of advantage.`;
+        }
       }
       metaEl.textContent = classificationNote();
       reviewForm.classList.remove("is-hidden");
@@ -393,7 +420,7 @@
     // Initial UI state
     promptEl.textContent = contextualPrompt();
     // Initialize eval bar immediately to avoid showing +0.0
-    updateEvalBar(evalBefore);
+    updateEvalBar(evalBefore, mateBefore);
     setupPlayerNames();
     }
     

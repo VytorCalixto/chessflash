@@ -138,11 +138,26 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 			continue
 		}
 
-		diff := evalAfter.CP - evalBefore.CP
+		// Normalize evaluation values for storage
+		var mateBefore *int
+		var mateAfter *int
+		evalBeforeCP := evalBefore.CP
+		evalAfterCP := evalAfter.CP
+		if evalBefore.Mate != nil {
+			mateBefore = evalBefore.Mate
+			// When mate is present, store 0 in CP fields (mate takes precedence)
+			evalBeforeCP = 0
+		}
+		if evalAfter.Mate != nil {
+			mateAfter = evalAfter.Mate
+			evalAfterCP = 0
+		}
+
+		diff := evalAfterCP - evalBeforeCP
 		log.Debug("evalBefore: %+v", evalBefore)
 		log.Debug("evalAfter: %+v", evalAfter)
 
-		classification := analysis.ClassifyMove(evalBefore.CP, evalAfter.CP, isWhiteMove)
+		classification := analysis.ClassifyMove(evalBeforeCP, evalAfterCP, isWhiteMove)
 		log.Debug("classification: %s", classification)
 
 		switch classification {
@@ -160,9 +175,11 @@ func (j *AnalyzeGameJob) Run(ctx context.Context) error {
 			FEN:            fenBefore,
 			MovePlayed:     moves[i].String(),
 			BestMove:       evalBefore.BestMove,
-			EvalBefore:     evalBefore.CP,
-			EvalAfter:      evalAfter.CP,
+			EvalBefore:     evalBeforeCP,
+			EvalAfter:      evalAfterCP,
 			EvalDiff:       diff,
+			MateBefore:     mateBefore,
+			MateAfter:      mateAfter,
 			Classification: classification,
 		})
 		if err != nil {

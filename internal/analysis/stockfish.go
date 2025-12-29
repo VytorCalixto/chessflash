@@ -16,7 +16,8 @@ import (
 
 type EvalResult struct {
 	BestMove string
-	CP       float64 // centipawns from white perspective
+	CP       float64 // centipawns from white perspective (only when Mate is nil)
+	Mate     *int    // mate in N (positive = white mates in N, negative = black mates in N)
 }
 
 type Engine struct {
@@ -146,7 +147,6 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 	}
 
 	var best EvalResult
-	var isMate bool
 	deadline := time.Now().Add(8 * time.Second)
 	for {
 		if ctx.Err() != nil {
@@ -164,25 +164,27 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 		}
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "info") {
-			if cp, ok, mate := parseScore(line); ok {
-				if mate {
-					isMate = true
-					// Mate score: positive means the side to move can force mate
-					// Convert to white's perspective
+			if cp, mate, ok := parseScore(line); ok {
+				if mate != nil {
+					best.Mate = mate
+					// Normalize mate to white's perspective by sign:
+					// mate > 0 -> side to move mates; mate < 0 -> side to move gets mated
+					// If black to move, flip sign to white perspective.
+					mateVal := *mate
 					if isBlackToMove {
-						// Black to move, mate means black wins → negative from white's perspective
-						best.CP = -cp
-					} else {
-						// White to move, mate means white wins → positive from white's perspective
-						best.CP = cp
+						mateVal = -mateVal
 					}
+					best.Mate = &mateVal
+					// For mate, CP is not meaningful; keep CP at 0
+					best.CP = 0
 				} else {
-					// Normalize to white's perspective
+					// Normalize centipawns to white's perspective
 					if isBlackToMove {
 						best.CP = -cp
 					} else {
 						best.CP = cp
 					}
+					best.Mate = nil
 				}
 			}
 		}
@@ -191,8 +193,8 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 			if len(parts) >= 2 {
 				best.BestMove = parts[1]
 			}
-			if isMate {
-				log.Debug("evaluation completed in %v: mate, bestmove=%s", time.Since(start), best.BestMove)
+			if best.Mate != nil {
+				log.Debug("evaluation completed in %v: mate=%d, bestmove=%s", time.Since(start), *best.Mate, best.BestMove)
 			} else {
 				log.Debug("evaluation completed in %v: cp=%.0f, bestmove=%s", time.Since(start), best.CP, best.BestMove)
 			}
@@ -201,26 +203,26 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 	}
 }
 
-func parseScore(line string) (float64, bool, bool) {
+// parseScore returns cp, mate, ok.
+// mate: nil if not mate; non-nil value is mate in N (positive: side to move mates in N, negative: side to move gets mated in N).
+func parseScore(line string) (float64, *int, bool) {
 	parts := strings.Fields(line)
 	for i := 0; i < len(parts); i++ {
 		if parts[i] == "score" && i+2 < len(parts) {
 			if parts[i+1] == "cp" {
 				if v, err := strconv.Atoi(parts[i+2]); err == nil {
-					return float64(v), true, false
+					return float64(v), nil, true
 				}
 			} else if parts[i+1] == "mate" {
 				// Mate score: positive means the side to move can force mate
-				// Convert to centipawns: use 10000 - (mateMoves * 10)
-				// This gives mate in 1 = 9990, mate in 2 = 9980, etc.
+				// Negative means the side to move is getting mated
 				if mateMoves, err := strconv.Atoi(parts[i+2]); err == nil {
-					cpValue := 10000.0 - float64(mateMoves)*10.0
-					return cpValue, true, true
+					return 0, &mateMoves, true
 				}
 			}
 		}
 	}
-	return 0, false, false
+	return 0, nil, false
 }
 
 func (e *Engine) send(cmd string) error {

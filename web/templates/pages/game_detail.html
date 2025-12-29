@@ -214,6 +214,8 @@
       evalBefore: {{printf "%.2f" .EvalBefore}},
       evalAfter: {{printf "%.2f" .EvalAfter}},
       evalDiff: {{printf "%.2f" .EvalDiff}},
+      mateBefore: {{if .MateBefore}}{{.MateBefore}}{{else}}null{{end}},
+      mateAfter: {{if .MateAfter}}{{.MateAfter}}{{else}}null{{end}},
       classification: "{{.Classification}}"
     }
     {{- end}}
@@ -240,7 +242,17 @@
     return val;
   }
 
-  function updateEvalBar(valPawns) {
+  function updateEvalBar(valPawns, mate) {
+    if (mate !== null && mate !== undefined) {
+      // Mate: full bar, show M#
+      evalFill.style.height = "100%";
+      const mateDisplay = Math.abs(mate);
+      const isWhiteMate = mate > 0;
+      evalLabel.textContent = (isWhiteMate ? "M" : "-M") + mateDisplay;
+      evalLabel.classList.toggle("white-advantage", isWhiteMate);
+      evalLabel.classList.toggle("black-advantage", !isWhiteMate);
+      return;
+    }
     const clamped = clampEval(valPawns);
     const percent = ((clamped + 10) / 20) * 100;
     evalFill.style.height = percent + "%";
@@ -337,8 +349,9 @@
     currentIndex = idx;
     const pos = positions[idx];
     const evalPawns = pos.evalAfter / 100;
+    const mate = pos.mateAfter;
     cg.set({ fen: pos.fen, orientation });
-    updateEvalBar(evalPawns);
+    updateEvalBar(evalPawns, mate);
     drawBestMoveArrow(pos.bestMove);
     bestMoveNote.textContent = "Best move: " + (pos.bestMove || "--");
     moveStatus.textContent = "Move " + (idx + 1) + "/" + positions.length;
