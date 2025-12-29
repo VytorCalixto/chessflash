@@ -25,155 +25,543 @@
 </div>
 <p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
 
-<h2 class="title is-5 mt-4">Time control performance</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Time class</th>
-      <th>Games</th>
-      <th>W</th>
-      <th>D</th>
-      <th>L</th>
-      <th>Win %</th>
-      <th>Avg blunders</th>
-      <th>Avg moves</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .time_stats}}
-    <tr>
-      <td>{{.TimeClass}}</td>
-      <td>{{.TotalGames}}</td>
-      <td>{{.Wins}}</td>
-      <td>{{.Draws}}</td>
-      <td>{{.Losses}}</td>
-      <td>{{printf "%.1f" .WinRate}}</td>
-      <td>{{printf "%.2f" .AvgBlunders}}</td>
-      <td>{{printf "%.1f" .AvgGameLength}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="8">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+{{if .summary_stats}}
+<!-- Summary Dashboard Cards -->
+<div class="columns is-multiline mt-4">
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Total Games</p>
+      <p class="title is-3">{{.summary_stats.TotalGames | printf "%d"}}</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Overall Win Rate</p>
+      <p class="title is-3">{{printf "%.1f" .summary_stats.OverallWinRate}}%</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Current Rating</p>
+      <p class="title is-3">{{.summary_stats.CurrentRating}}</p>
+    </div>
+  </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Total Blunders</p>
+      <p class="title is-3">{{.summary_stats.TotalBlunders}}</p>
+      <p class="subtitle is-7 mt-1">Avg: {{printf "%.2f" .summary_stats.AvgBlundersPerGame}}/game</p>
+    </div>
+  </div>
+</div>
+{{end}}
 
-<h2 class="title is-5 mt-4">Color performance</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Played as</th>
-      <th>Games</th>
-      <th>W</th>
-      <th>D</th>
-      <th>L</th>
-      <th>Win %</th>
-      <th>Avg blunders</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .color_stats}}
-    <tr>
-      <td>{{.PlayedAs}}</td>
-      <td>{{.TotalGames}}</td>
-      <td>{{.Wins}}</td>
-      <td>{{.Draws}}</td>
-      <td>{{.Losses}}</td>
-      <td>{{printf "%.1f" .WinRate}}</td>
-      <td>{{printf "%.2f" .AvgBlunders}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="7">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+<!-- Rating Progression Chart -->
+{{if .rating_stats}}
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">📈</span>
+      Rating Progression
+    </p>
+  </div>
+  <div class="card-content">
+    <canvas id="ratingChart" height="80"></canvas>
+  </div>
+</div>
+{{end}}
 
-<h2 class="title is-5 mt-4">Monthly trend</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Month</th>
-      <th>Games</th>
-      <th>W</th>
-      <th>D</th>
-      <th>L</th>
-      <th>Win %</th>
-      <th>Total blunders</th>
-      <th>Blunders/game</th>
-      <th>Avg rating</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .monthly_stats}}
-    <tr>
-      <td>{{.YearMonth}}</td>
-      <td>{{.TotalGames}}</td>
-      <td>{{.Wins}}</td>
-      <td>{{.Draws}}</td>
-      <td>{{.Losses}}</td>
-      <td>{{printf "%.1f" .WinRate}}</td>
-      <td>{{.TotalBlunders}}</td>
-      <td>{{printf "%.2f" .BlunderRate}}</td>
-      <td>{{printf "%.0f" .AvgRating}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="9">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+<!-- Time Control Performance -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">⏱️</span>
+      Time Control Performance
+    </p>
+  </div>
+  <div class="card-content">
+    <div class="table-container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Time class</th>
+            <th>Games</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>Win %</th>
+            <th>Avg blunders</th>
+            <th>Avg moves</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .time_stats}}
+          <tr>
+            <td><strong>{{.TimeClass}}</strong></td>
+            <td>{{.TotalGames}}</td>
+            <td>{{.Wins}}</td>
+            <td>{{.Draws}}</td>
+            <td>{{.Losses}}</td>
+            <td>
+              <span class="tag {{if ge .WinRate 55.0}}is-success{{else if ge .WinRate 45.0}}is-warning{{else}}is-danger{{end}}">
+                {{printf "%.1f" .WinRate}}%
+              </span>
+              <progress class="progress is-small {{if ge .WinRate 55.0}}is-success{{else if ge .WinRate 45.0}}is-warning{{else}}is-danger{{end}}" value="{{.WinRate}}" max="100" style="width: 80px; margin-left: 8px; display: inline-block;">{{printf "%.1f" .WinRate}}%</progress>
+            </td>
+            <td>{{printf "%.2f" .AvgBlunders}}</td>
+            <td>{{printf "%.1f" .AvgGameLength}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="8">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-<h2 class="title is-5 mt-4">Mistake patterns by phase</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Phase</th>
-      <th>Classification</th>
-      <th>Count</th>
-      <th>Avg eval loss</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .mistake_stats}}
-    <tr>
-      <td>{{.Phase}}</td>
-      <td>{{.Classification}}</td>
-      <td>{{.Count}}</td>
-      <td>{{printf "%.1f" .AvgEvalLoss}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="4">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+<!-- Color Performance -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">🎨</span>
+      Color Performance
+    </p>
+  </div>
+  <div class="card-content">
+    <div class="table-container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Played as</th>
+            <th>Games</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>Win %</th>
+            <th>Avg blunders</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .color_stats}}
+          <tr>
+            <td><strong>{{.PlayedAs}}</strong></td>
+            <td>{{.TotalGames}}</td>
+            <td>{{.Wins}}</td>
+            <td>{{.Draws}}</td>
+            <td>{{.Losses}}</td>
+            <td>
+              <span class="tag {{if ge .WinRate 55.0}}is-success{{else if ge .WinRate 45.0}}is-warning{{else}}is-danger{{end}}">
+                {{printf "%.1f" .WinRate}}%
+              </span>
+              <progress class="progress is-small {{if ge .WinRate 55.0}}is-success{{else if ge .WinRate 45.0}}is-warning{{else}}is-danger{{end}}" value="{{.WinRate}}" max="100" style="width: 80px; margin-left: 8px; display: inline-block;">{{printf "%.1f" .WinRate}}%</progress>
+            </td>
+            <td>{{printf "%.2f" .AvgBlunders}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="7">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-<h2 class="title is-5 mt-4">Rating progression</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Time class</th>
-      <th>Games with rating</th>
-      <th>Min</th>
-      <th>Max</th>
-      <th>Avg</th>
-      <th>Current</th>
-      <th>Change</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .rating_stats}}
-    <tr>
-      <td>{{.TimeClass}}</td>
-      <td>{{.GamesTracked}}</td>
-      <td>{{.MinRating}}</td>
-      <td>{{.MaxRating}}</td>
-      <td>{{printf "%.0f" .AvgRating}}</td>
-      <td>{{.CurrentRating}}</td>
-      <td>{{.RatingChange}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="7">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+<!-- Monthly Trend Chart -->
+{{if .monthly_stats}}
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">📅</span>
+      Monthly Performance Trends
+    </p>
+    <button class="card-header-icon" aria-label="toggle table" onclick="toggleMonthlyTable()">
+      <span class="icon" id="monthlyToggleIcon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+      </span>
+    </button>
+  </div>
+  <div class="card-content">
+    <canvas id="monthlyChart" height="100"></canvas>
+    <div id="monthlyTableSection" style="display: none;" class="mt-4">
+      <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+        <table class="table is-striped is-fullwidth">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Games</th>
+              <th>W</th>
+              <th>D</th>
+              <th>L</th>
+              <th>Win %</th>
+              <th>Total blunders</th>
+              <th>Blunders/game</th>
+              <th>Avg rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .monthly_stats}}
+            <tr>
+              <td>{{.YearMonth}}</td>
+              <td>{{.TotalGames}}</td>
+              <td>{{.Wins}}</td>
+              <td>{{.Draws}}</td>
+              <td>{{.Losses}}</td>
+              <td>
+                <span class="tag {{if ge .WinRate 55.0}}is-success{{else if ge .WinRate 45.0}}is-warning{{else}}is-danger{{end}}">
+                  {{printf "%.1f" .WinRate}}%
+                </span>
+              </td>
+              <td>{{.TotalBlunders}}</td>
+              <td>{{printf "%.2f" .BlunderRate}}</td>
+              <td>{{printf "%.0f" .AvgRating}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="9">No data yet.</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Mistake Patterns by Phase -->
+{{if .mistake_stats}}
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">🔍</span>
+      Mistake Patterns by Phase
+    </p>
+  </div>
+  <div class="card-content">
+    <canvas id="mistakeChart" height="80"></canvas>
+    <div class="table-container mt-4">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Classification</th>
+            <th>Count</th>
+            <th>Avg eval loss</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .mistake_stats}}
+          <tr>
+            <td><strong>{{.Phase}}</strong></td>
+            <td>
+              <span class="tag {{if eq .Classification "blunder"}}is-danger{{else if eq .Classification "mistake"}}is-warning{{else if eq .Classification "inaccuracy"}}is-warning is-light{{else}}is-success{{end}}">
+                {{.Classification}}
+              </span>
+            </td>
+            <td>{{.Count}}</td>
+            <td>{{printf "%.1f" .AvgEvalLoss}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Rating Progression Table -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">⭐</span>
+      Rating Progression Details
+    </p>
+  </div>
+  <div class="card-content">
+    <div class="table-container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Time class</th>
+            <th>Games with rating</th>
+            <th>Min</th>
+            <th>Max</th>
+            <th>Avg</th>
+            <th>Current</th>
+            <th>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .rating_stats}}
+          <tr>
+            <td><strong>{{.TimeClass}}</strong></td>
+            <td>{{.GamesTracked}}</td>
+            <td>{{.MinRating}}</td>
+            <td>{{.MaxRating}}</td>
+            <td>{{printf "%.0f" .AvgRating}}</td>
+            <td><strong>{{.CurrentRating}}</strong></td>
+            <td>
+              {{if gt .RatingChange 0}}
+                <span class="tag is-success">↑ {{.RatingChange}}</span>
+              {{else if lt .RatingChange 0}}
+                <span class="tag is-danger">↓ {{.RatingChange}}</span>
+              {{else}}
+                <span class="tag">—</span>
+              {{end}}
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="7">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Rating Progression Chart
+{{if .rating_stats}}
+const ratingCtx = document.getElementById('ratingChart');
+if (ratingCtx) {
+  const ratingData = {
+    labels: [{{range $i, $stat := .rating_stats}}{{if $i}}, {{end}}"{{$stat.TimeClass}}"{{end}}],
+    datasets: [{
+      label: 'Current Rating',
+      data: [{{range $i, $stat := .rating_stats}}{{if $i}}, {{end}}{{$stat.CurrentRating}}{{end}}],
+      borderColor: 'rgb(72, 95, 199)',
+      backgroundColor: 'rgba(72, 95, 199, 0.1)',
+      tension: 0.1
+    }, {
+      label: 'Average Rating',
+      data: [{{range $i, $stat := .rating_stats}}{{if $i}}, {{end}}{{printf "%.0f" $stat.AvgRating}}{{end}}],
+      borderColor: 'rgb(72, 199, 142)',
+      backgroundColor: 'rgba(72, 199, 142, 0.1)',
+      tension: 0.1
+    }]
+  };
+  
+  new Chart(ratingCtx, {
+    type: 'line',
+    data: ratingData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        y: {
+          beginAtZero: false
+        }
+      },
+      plugins: {
+        legend: {
+          display: true
+        }
+      }
+    }
+  });
+}
+{{end}}
+
+// Monthly Trend Chart
+{{if .monthly_stats}}
+const monthlyCtx = document.getElementById('monthlyChart');
+if (monthlyCtx) {
+  const monthlyData = {
+    labels: [{{range $i, $stat := .monthly_stats}}{{if $i}}, {{end}}"{{$stat.YearMonth}}"{{end}}].reverse(),
+    datasets: [{
+      label: 'Games',
+      data: [{{range $i, $stat := .monthly_stats}}{{if $i}}, {{end}}{{$stat.TotalGames}}{{end}}].reverse(),
+      borderColor: 'rgb(72, 95, 199)',
+      backgroundColor: 'rgba(72, 95, 199, 0.1)',
+      yAxisID: 'y',
+      tension: 0.1
+    }, {
+      label: 'Win Rate %',
+      data: [{{range $i, $stat := .monthly_stats}}{{if $i}}, {{end}}{{printf "%.1f" $stat.WinRate}}{{end}}].reverse(),
+      borderColor: 'rgb(72, 199, 142)',
+      backgroundColor: 'rgba(72, 199, 142, 0.1)',
+      yAxisID: 'y1',
+      tension: 0.1
+    }, {
+      label: 'Blunders/Game',
+      data: [{{range $i, $stat := .monthly_stats}}{{if $i}}, {{end}}{{printf "%.2f" $stat.BlunderRate}}{{end}}].reverse(),
+      borderColor: 'rgb(255, 159, 28)',
+      backgroundColor: 'rgba(255, 159, 28, 0.1)',
+      yAxisID: 'y2',
+      tension: 0.1
+    }]
+  };
+  
+  new Chart(monthlyCtx, {
+    type: 'line',
+    data: monthlyData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Games'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Win Rate %'
+          },
+          grid: {
+            drawOnChartArea: false,
+          },
+        },
+        y2: {
+          type: 'linear',
+          display: false,
+        }
+      },
+      plugins: {
+        legend: {
+          display: true
+        }
+      }
+    }
+  });
+}
+
+function toggleMonthlyTable() {
+  const section = document.getElementById('monthlyTableSection');
+  const icon = document.getElementById('monthlyToggleIcon');
+  if (section.style.display === 'none') {
+    section.style.display = 'block';
+    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg>';
+  } else {
+    section.style.display = 'none';
+    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>';
+  }
+}
+{{end}}
+
+// Mistake Patterns Chart
+{{if .mistake_stats}}
+const mistakeCtx = document.getElementById('mistakeChart');
+if (mistakeCtx) {
+  // Group by phase
+  const phases = {};
+  {{range .mistake_stats}}
+  if (!phases['{{.Phase}}']) {
+    phases['{{.Phase}}'] = { blunder: 0, mistake: 0, inaccuracy: 0, good: 0 };
+  }
+  {{if eq .Classification "blunder"}}
+  phases['{{.Phase}}'].blunder = {{.Count}};
+  {{else if eq .Classification "mistake"}}
+  phases['{{.Phase}}'].mistake = {{.Count}};
+  {{else if eq .Classification "inaccuracy"}}
+  phases['{{.Phase}}'].inaccuracy = {{.Count}};
+  {{else if eq .Classification "good"}}
+  phases['{{.Phase}}'].good = {{.Count}};
+  {{end}}
+  {{end}}
+  
+  const phaseLabels = Object.keys(phases);
+  const blunderData = phaseLabels.map(p => phases[p].blunder || 0);
+  const mistakeData = phaseLabels.map(p => phases[p].mistake || 0);
+  const inaccuracyData = phaseLabels.map(p => phases[p].inaccuracy || 0);
+  const goodData = phaseLabels.map(p => phases[p].good || 0);
+  
+  new Chart(mistakeCtx, {
+    type: 'bar',
+    data: {
+      labels: phaseLabels,
+      datasets: [{
+        label: 'Blunders',
+        data: blunderData,
+        backgroundColor: 'rgba(241, 70, 104, 0.8)',
+        borderColor: 'rgb(241, 70, 104)',
+        borderWidth: 1
+      }, {
+        label: 'Mistakes',
+        data: mistakeData,
+        backgroundColor: 'rgba(255, 159, 28, 0.8)',
+        borderColor: 'rgb(255, 159, 28)',
+        borderWidth: 1
+      }, {
+        label: 'Inaccuracies',
+        data: inaccuracyData,
+        backgroundColor: 'rgba(255, 224, 138, 0.8)',
+        borderColor: 'rgb(255, 224, 138)',
+        borderWidth: 1
+      }, {
+        label: 'Good',
+        data: goodData,
+        backgroundColor: 'rgba(72, 199, 142, 0.8)',
+        borderColor: 'rgb(72, 199, 142)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          stacked: false
+        },
+        x: {
+          stacked: false
+        }
+      },
+      plugins: {
+        legend: {
+          display: true
+        }
+      }
+    }
+  });
+}
+{{end}}
+</script>
+
+<style>
+.progress {
+  width: 80px;
+  margin-left: 8px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.table-container {
+  overflow-x: auto;
+}
+.card-header-icon {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.75rem;
+}
+.card-header-icon:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+@media (max-width: 768px) {
+  .columns.is-multiline .column.is-one-quarter {
+    width: 50%;
+  }
+  .progress {
+    width: 60px;
+  }
+}
+</style>
 
 {{template "foot" .}}
 {{end}}

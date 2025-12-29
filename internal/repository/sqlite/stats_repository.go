@@ -511,6 +511,61 @@ GROUP BY rh.quality
 	}, rows.Err()
 }
 
+func (r *statsRepository) SummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error) {
+	log := logger.FromContext(ctx).WithPrefix("stats_repo")
+	log.Debug("fetching summary stats: profile_id=%d", profileID)
+
+	var stat models.SummaryStat
+	
+	// Get total games and overall win rate from time class stats
+	err := r.db.QueryRowContext(ctx, `
+SELECT 
+    COALESCE(SUM(total_games), 0) AS total_games,
+    CASE 
+        WHEN SUM(total_games) > 0 
+        THEN ROUND(100.0 * SUM(wins) / SUM(total_games), 1)
+        ELSE 0 
+    END AS overall_win_rate
+FROM time_class_stats_cache
+WHERE profile_id = ?
+`, profileID).Scan(&stat.TotalGames, &stat.OverallWinRate)
+	if err != nil {
+		log.Error("failed to get games/wins from summary stats: %v", err)
+		return nil, err
+	}
+
+	// Get current highest rating from rating stats
+	err = r.db.QueryRowContext(ctx, `
+SELECT COALESCE(MAX(current_rating), 0)
+FROM rating_stats_cache
+WHERE profile_id = ?
+`, profileID).Scan(&stat.CurrentRating)
+	if err != nil {
+		log.Error("failed to get current rating from summary stats: %v", err)
+		return nil, err
+	}
+
+	// Get total blunders from monthly stats
+	err = r.db.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(total_blunders), 0)
+FROM monthly_stats_cache
+WHERE profile_id = ?
+`, profileID).Scan(&stat.TotalBlunders)
+	if err != nil {
+		log.Error("failed to get total blunders from summary stats: %v", err)
+		return nil, err
+	}
+
+	// Calculate average blunders per game
+	if stat.TotalGames > 0 {
+		stat.AvgBlundersPerGame = float64(stat.TotalBlunders) / float64(stat.TotalGames)
+	} else {
+		stat.AvgBlundersPerGame = 0
+	}
+
+	return &stat, nil
+}
+
 func (r *statsRepository) RefreshProfileStats(ctx context.Context, profileID int64) error {
 	log := logger.FromContext(ctx).WithPrefix("stats_repo")
 	log.Debug("refreshing cached stats: profile_id=%d", profileID)

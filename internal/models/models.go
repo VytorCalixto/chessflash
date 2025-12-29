@@ -214,3 +214,11 @@ type FlashcardTimeStat struct {
 	SlowestTime       float64         `json:"slowest_time"`
 	TimeByQuality     map[int]float64 `json:"time_by_quality"`
 }
+
+type SummaryStat struct {
+	TotalGames        int     `json:"total_games"`
+	OverallWinRate    float64 `json:"overall_win_rate"`
+	CurrentRating     int     `json:"current_rating"`
+	TotalBlunders     int     `json:"total_blunders"`
+	AvgBlundersPerGame float64 `json:"avg_blunders_per_game"`
+}

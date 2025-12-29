@@ -63,5 +63,6 @@ type StatsRepository interface {
 	FlashcardPhaseStats(ctx context.Context, profileID int64) ([]models.FlashcardPhaseStat, error)
 	FlashcardOpeningStats(ctx context.Context, profileID int64, limit int) ([]models.FlashcardOpeningStat, error)
 	FlashcardTimeStats(ctx context.Context, profileID int64) (*models.FlashcardTimeStat, error)
+	SummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error)
 	RefreshProfileStats(ctx context.Context, profileID int64) error
 }

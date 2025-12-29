@@ -160,6 +160,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	log = log.WithField("username", profile.Username)
 	log.Debug("fetching aggregate stats")
 
+	summaryStats, err := s.StatsService.GetSummaryStats(r.Context(), profile.ID)
+	if err != nil {
+		log.Warn("failed to get summary stats, continuing without them: %v", err)
+		summaryStats = nil
+	}
 	timeStats, err := s.StatsService.GetTimeClassStats(r.Context(), profile.ID)
 	if err != nil {
 		handleError(w, r, err)
@@ -187,6 +192,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "pages/stats.html", pageData{
+		"summary_stats": summaryStats,
 		"time_stats":    timeStats,
 		"color_stats":   colorStats,
 		"monthly_stats": monthlyStats,

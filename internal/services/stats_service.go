@@ -18,6 +18,7 @@ type StatsService interface {
 	GetMonthlyStats(ctx context.Context, profileID int64) ([]models.MonthlyStat, error)
 	GetMistakePhaseStats(ctx context.Context, profileID int64) ([]models.MistakePhaseStat, error)
 	GetRatingStats(ctx context.Context, profileID int64) ([]models.RatingStat, error)
+	GetSummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error)
 	GetFlashcardStats(ctx context.Context, profileID int64) (*models.FlashcardStat, error)
 	GetFlashcardClassificationStats(ctx context.Context, profileID int64) ([]models.FlashcardClassificationStat, error)
 	GetFlashcardPhaseStats(ctx context.Context, profileID int64) ([]models.FlashcardPhaseStat, error)
@@ -132,6 +133,19 @@ func (s *statsService) GetRatingStats(ctx context.Context, profileID int64) ([]m
 	stats, err := s.statsRepo.RatingStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get rating stats: %v", err)
+		return nil, errors.NewInternalError(err)
+	}
+
+	return stats, nil
+}
+
+func (s *statsService) GetSummaryStats(ctx context.Context, profileID int64) (*models.SummaryStat, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("getting summary stats: profile_id=%d", profileID)
+
+	stats, err := s.statsRepo.SummaryStats(ctx, profileID)
+	if err != nil {
+		log.Error("failed to get summary stats: %v", err)
 		return nil, errors.NewInternalError(err)
 	}
 
