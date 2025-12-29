@@ -476,7 +476,7 @@ AND position_id IN (
     JOIN games g ON g.id = p.game_id
     WHERE g.profile_id = ?
 )
-ORDER BY due_at ASC
+ORDER BY RANDOM()
 LIMIT ?
 `, profileID, limit)
 	if err != nil {
