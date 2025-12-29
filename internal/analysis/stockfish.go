@@ -146,6 +146,7 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 	}
 
 	var best EvalResult
+	var isMate bool
 	deadline := time.Now().Add(8 * time.Second)
 	for {
 		if ctx.Err() != nil {
@@ -163,12 +164,25 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 		}
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "info") {
-			if cp, ok := parseCP(line); ok {
-				// Normalize to white's perspective
-				if isBlackToMove {
-					best.CP = -cp
+			if cp, ok, mate := parseScore(line); ok {
+				if mate {
+					isMate = true
+					// Mate score: positive means the side to move can force mate
+					// Convert to white's perspective
+					if isBlackToMove {
+						// Black to move, mate means black wins → negative from white's perspective
+						best.CP = -cp
+					} else {
+						// White to move, mate means white wins → positive from white's perspective
+						best.CP = cp
+					}
 				} else {
-					best.CP = cp
+					// Normalize to white's perspective
+					if isBlackToMove {
+						best.CP = -cp
+					} else {
+						best.CP = cp
+					}
 				}
 			}
 		}
@@ -177,24 +191,36 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 			if len(parts) >= 2 {
 				best.BestMove = parts[1]
 			}
-			log.Debug("evaluation completed in %v: cp=%.0f, bestmove=%s", time.Since(start), best.CP, best.BestMove)
+			if isMate {
+				log.Debug("evaluation completed in %v: mate, bestmove=%s", time.Since(start), best.BestMove)
+			} else {
+				log.Debug("evaluation completed in %v: cp=%.0f, bestmove=%s", time.Since(start), best.CP, best.BestMove)
+			}
 			return best, nil
 		}
 	}
 }
 
-func parseCP(line string) (float64, bool) {
+func parseScore(line string) (float64, bool, bool) {
 	parts := strings.Fields(line)
 	for i := 0; i < len(parts); i++ {
 		if parts[i] == "score" && i+2 < len(parts) {
 			if parts[i+1] == "cp" {
 				if v, err := strconv.Atoi(parts[i+2]); err == nil {
-					return float64(v), true
+					return float64(v), true, false
+				}
+			} else if parts[i+1] == "mate" {
+				// Mate score: positive means the side to move can force mate
+				// Convert to centipawns: use 10000 - (mateMoves * 10)
+				// This gives mate in 1 = 9990, mate in 2 = 9980, etc.
+				if mateMoves, err := strconv.Atoi(parts[i+2]); err == nil {
+					cpValue := 10000.0 - float64(mateMoves)*10.0
+					return cpValue, true, true
 				}
 			}
 		}
 	}
-	return 0, false
+	return 0, false, false
 }
 
 func (e *Engine) send(cmd string) error {
