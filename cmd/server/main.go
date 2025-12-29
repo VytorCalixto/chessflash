@@ -46,6 +46,7 @@ func main() {
 	log.Debug("db_path=%s", cfg.DBPath)
 	log.Debug("stockfish_path=%s", cfg.StockfishPath)
 	log.Debug("stockfish_depth=%d", cfg.StockfishDepth)
+	log.Debug("stockfish_max_time=%d", cfg.StockfishMaxTime)
 	log.Debug("log_level=%s", cfg.LogLevel)
 	log.Debug("analysis_worker_count=%d", cfg.AnalysisWorkerCount)
 	log.Debug("analysis_queue_size=%d", cfg.AnalysisQueueSize)
@@ -99,7 +100,8 @@ func main() {
 	// Initialize services (order matters - analysisService needs to be created before jobQueue)
 	profileService := services.NewProfileService(profileRepo)
 	analysisConfig := services.AnalysisConfig{
-		StockfishDepth: cfg.StockfishDepth,
+		StockfishDepth:  cfg.StockfishDepth,
+		StockfishMaxTime: cfg.StockfishMaxTime,
 	}
 	analysisService := services.NewAnalysisService(
 		gameRepo,

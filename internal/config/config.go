@@ -16,6 +16,7 @@ type Config struct {
 	DBPath                 string
 	StockfishPath          string
 	StockfishDepth         int
+	StockfishMaxTime       int // Max time in milliseconds per position (0 = no limit)
 	LogLevel               string
 	AnalysisWorkerCount    int
 	AnalysisQueueSize      int
@@ -36,6 +37,7 @@ func Load() Config {
 		DBPath:                 envOr("DB_PATH", "file:chessflash.db"),
 		StockfishPath:          envOr("STOCKFISH_PATH", "stockfish"),
 		StockfishDepth:         envIntOr("STOCKFISH_DEPTH", 18),
+		StockfishMaxTime:       envIntOr("STOCKFISH_MAX_TIME", 0), // 0 = disabled, use depth only
 		LogLevel:               envOr("LOG_LEVEL", "INFO"),
 		AnalysisWorkerCount:    envIntOr("ANALYSIS_WORKER_COUNT", 2),
 		AnalysisQueueSize:      envIntOr("ANALYSIS_QUEUE_SIZE", 64),

@@ -113,12 +113,13 @@ func (e *Engine) Close() error {
 	return err
 }
 
-func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalResult, error) {
+func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int, maxTimeMs int) (EvalResult, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	log := e.log.WithFields(map[string]any{
-		"depth": depth,
+		"depth":      depth,
+		"max_time_ms": maxTimeMs,
 	})
 
 	if depth == 0 {
@@ -141,20 +142,33 @@ func (e *Engine) EvaluateFEN(ctx context.Context, fen string, depth int) (EvalRe
 	parts := strings.Fields(fen)
 	isBlackToMove := len(parts) > 1 && parts[1] == "b"
 
-	if err := e.sendLocked(fmt.Sprintf("go depth %d", depth)); err != nil {
+	// Build go command with optional movetime
+	var goCmd string
+	if maxTimeMs > 0 {
+		goCmd = fmt.Sprintf("go depth %d movetime %d", depth, maxTimeMs)
+	} else {
+		goCmd = fmt.Sprintf("go depth %d", depth)
+	}
+
+	if err := e.sendLocked(goCmd); err != nil {
 		log.Error("failed to start analysis: %v", err)
 		return EvalResult{}, err
 	}
 
 	var best EvalResult
-	deadline := time.Now().Add(8 * time.Second)
+	// Use maxTimeMs + buffer for deadline, or default 8s if no limit
+	deadlineDuration := 8 * time.Second
+	if maxTimeMs > 0 {
+		deadlineDuration = time.Duration(maxTimeMs)*time.Millisecond + 500*time.Millisecond // Add 500ms buffer
+	}
+	deadline := time.Now().Add(deadlineDuration)
 	for {
 		if ctx.Err() != nil {
 			log.Warn("evaluation cancelled: %v", ctx.Err())
 			return EvalResult{}, ctx.Err()
 		}
 		if time.Now().After(deadline) {
-			log.Error("evaluation timed out after 8s")
+			log.Error("evaluation timed out after %v", deadlineDuration)
 			return EvalResult{}, errors.New("stockfish timeout")
 		}
 		line, err := e.stdout.ReadString('\n')

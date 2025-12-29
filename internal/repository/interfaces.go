@@ -20,6 +20,8 @@ type GameRepository interface {
 	GamesNeedingAnalysis(ctx context.Context, profileID int64) ([]models.Game, error)
 	CountGamesNeedingAnalysis(ctx context.Context, profileID int64) (int, error)
 	GetExistingChessComIDs(ctx context.Context, profileID int64) (map[string]bool, error)
+	CountByStatus(ctx context.Context, profileID int64, status string) (int, error)
+	GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error)
 }
 
 // PositionRepository handles position data access

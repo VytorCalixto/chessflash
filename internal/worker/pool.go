@@ -178,3 +178,8 @@ func (p *Pool) Submit(job Job) {
 func (p *Pool) QueueSize() int {
 	return len(p.jobs)
 }
+
+// WorkerCount returns the number of workers in the pool.
+func (p *Pool) WorkerCount() int {
+	return p.workers
+}

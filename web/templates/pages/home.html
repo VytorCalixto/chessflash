@@ -39,6 +39,33 @@
   </div>
 </div>
 
+<!-- Analysis Progress Section -->
+<div id="analysis-progress" class="box mb-5" style="display: none;">
+  <h2 class="title is-5 mb-4">Analysis Progress</h2>
+  <div id="progress-stats" class="mb-4">
+    <div class="columns">
+      <div class="column">
+        <p class="heading">Pending</p>
+        <p class="title is-5" id="stat-pending">-</p>
+      </div>
+      <div class="column">
+        <p class="heading">Processing</p>
+        <p class="title is-5" id="stat-processing">-</p>
+      </div>
+      <div class="column">
+        <p class="heading">Completed</p>
+        <p class="title is-5" id="stat-completed">-</p>
+      </div>
+      <div class="column">
+        <p class="heading">Estimated Time</p>
+        <p class="title is-5" id="stat-estimated">-</p>
+      </div>
+    </div>
+  </div>
+  <progress id="progress-bar" class="progress is-primary" value="0" max="100">0%</progress>
+  <p class="help mt-2" id="progress-text">Calculating progress...</p>
+</div>
+
 <!-- Quick Stats Section -->
 {{if .total_games}}
 <div class="columns mb-5">
@@ -133,6 +160,50 @@
   }
 })();
 // #endregion
+
+// Auto-refresh analysis status every 5 seconds
+(function() {
+  function updateAnalysisStatus() {
+    fetch('/api/analysis/status')
+      .then(function(r) {
+        if (!r.ok) {
+          throw new Error('Failed to fetch analysis status');
+        }
+        return r.json();
+      })
+      .then(function(data) {
+        document.getElementById('stat-pending').textContent = data.pending || 0;
+        document.getElementById('stat-processing').textContent = data.processing || 0;
+        document.getElementById('stat-completed').textContent = data.completed || 0;
+        document.getElementById('stat-estimated').textContent = data.estimated_time || 'N/A';
+        
+        var total = (data.pending || 0) + (data.processing || 0) + (data.completed || 0);
+        var progress = total > 0 ? ((data.completed || 0) / total) * 100 : 0;
+        var progressBar = document.getElementById('progress-bar');
+        progressBar.value = progress;
+        progressBar.textContent = Math.round(progress) + '%';
+        
+        var queueText = (data.queue_size || 0) + ' in queue';
+        document.getElementById('progress-text').textContent = 
+          (data.completed || 0) + ' of ' + total + ' games analyzed (' + queueText + ')';
+        
+        // Show progress section if there are pending/processing games
+        var progressSection = document.getElementById('analysis-progress');
+        if ((data.pending || 0) > 0 || (data.processing || 0) > 0) {
+          progressSection.style.display = 'block';
+        } else {
+          progressSection.style.display = 'none';
+        }
+      })
+      .catch(function(err) {
+        console.error('Failed to fetch analysis status:', err);
+      });
+  }
+  
+  // Update immediately and then every 5 seconds
+  updateAnalysisStatus();
+  setInterval(updateAnalysisStatus, 5000);
+})();
 </script>
 {{template "foot" .}}
 {{end}}

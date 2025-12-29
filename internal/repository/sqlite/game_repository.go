@@ -354,3 +354,52 @@ func (r *gameRepository) GetExistingChessComIDs(ctx context.Context, profileID i
 	}
 	return out, rows.Err()
 }
+
+func (r *gameRepository) CountByStatus(ctx context.Context, profileID int64, status string) (int, error) {
+	log := logger.FromContext(ctx).WithPrefix("game_repo")
+	log.Debug("counting games by status: profile_id=%d, status=%s", profileID, status)
+
+	var count int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM games 
+		WHERE profile_id = ? AND analysis_status = ?
+	`, profileID, status).Scan(&count)
+	if err != nil {
+		log.Error("failed to count games by status: %v", err)
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *gameRepository) GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error) {
+	log := logger.FromContext(ctx).WithPrefix("game_repo")
+	log.Debug("calculating average analysis time: profile_id=%d", profileID)
+
+	var avgSeconds sql.NullFloat64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT AVG(
+			(julianday(MAX(p.created_at)) - julianday(MIN(p.created_at))) * 86400
+		) as avg_seconds
+		FROM games g
+		INNER JOIN positions p ON p.game_id = g.id
+		WHERE g.profile_id = ? AND g.analysis_status = 'completed'
+		GROUP BY g.id
+		HAVING COUNT(p.id) > 0
+	`, profileID).Scan(&avgSeconds)
+	
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Debug("no completed games with positions found, using default")
+			return 30.0, nil
+		}
+		log.Error("failed to calculate average analysis time: %v", err)
+		return 0, err
+	}
+	
+	if !avgSeconds.Valid || avgSeconds.Float64 == 0 {
+		log.Debug("average analysis time is zero or null, using default")
+		return 30.0, nil
+	}
+	
+	return avgSeconds.Float64, nil
+}

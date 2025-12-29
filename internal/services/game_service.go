@@ -20,6 +20,8 @@ type GameService interface {
 	QueueGameAnalysis(ctx context.Context, gameID int64, profileID int64) error
 	ResumeAnalysis(ctx context.Context, profileID int64) (int, error)
 	CountGamesNeedingAnalysis(ctx context.Context, profileID int64) (int, error)
+	CountGamesByStatus(ctx context.Context, profileID int64, status string) (int, error)
+	GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error)
 }
 
 type gameService struct {
@@ -162,4 +164,30 @@ func (s *gameService) CountGamesNeedingAnalysis(ctx context.Context, profileID i
 	}
 
 	return count, nil
+}
+
+func (s *gameService) CountGamesByStatus(ctx context.Context, profileID int64, status string) (int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("counting games by status: profile_id=%d, status=%s", profileID, status)
+
+	count, err := s.gameRepo.CountByStatus(ctx, profileID, status)
+	if err != nil {
+		log.Error("failed to count games by status: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	return count, nil
+}
+
+func (s *gameService) GetAverageAnalysisTime(ctx context.Context, profileID int64) (float64, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("getting average analysis time: profile_id=%d", profileID)
+
+	avgTime, err := s.gameRepo.GetAverageAnalysisTime(ctx, profileID)
+	if err != nil {
+		log.Error("failed to get average analysis time: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	return avgTime, nil
 }

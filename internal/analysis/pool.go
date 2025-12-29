@@ -78,14 +78,14 @@ func (p *EnginePool) Release(engine *Engine) {
 }
 
 // Evaluate acquires an engine, evaluates, and releases it back.
-func (p *EnginePool) Evaluate(ctx context.Context, fen string, depth int) (EvalResult, error) {
+func (p *EnginePool) Evaluate(ctx context.Context, fen string, depth int, maxTimeMs int) (EvalResult, error) {
 	engine, err := p.Acquire(ctx)
 	if err != nil {
 		return EvalResult{}, err
 	}
 	defer p.Release(engine)
 
-	return engine.EvaluateFEN(ctx, fen, depth)
+	return engine.EvaluateFEN(ctx, fen, depth, maxTimeMs)
 }
 
 // Close shuts down all engines in the pool.

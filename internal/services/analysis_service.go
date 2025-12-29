@@ -62,11 +62,17 @@ func (s *analysisService) EvaluatePosition(ctx context.Context, fen string, stoc
 		depth = stockfishDepth
 	}
 
+	// Use shorter time for real-time evaluation
+	maxTimeMs := 2000 // 2 seconds for real-time
+	if s.config.StockfishMaxTime > 0 && s.config.StockfishMaxTime < maxTimeMs {
+		maxTimeMs = s.config.StockfishMaxTime
+	}
+
 	// Set timeout for evaluation
 	evalCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	result, err := s.pool.Evaluate(evalCtx, fen, depth)
+	result, err := s.pool.Evaluate(evalCtx, fen, depth, maxTimeMs)
 	if err != nil {
 		log.Error("failed to evaluate position: %v", err)
 		return analysis.EvalResult{}, errors.NewInternalError(err)
@@ -119,7 +125,11 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 	if depth <= 0 {
 		depth = 18
 	}
-	log = log.WithField("depth", depth)
+	maxTimeMs := s.config.StockfishMaxTime
+	log = log.WithFields(map[string]any{
+		"depth":       depth,
+		"max_time_ms": maxTimeMs,
+	})
 
 	log.Debug("parsing PGN")
 	pgnOpt, err := chess.PGN(strings.NewReader(game.PGN))
@@ -190,7 +200,7 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		} else {
 			// First move: evaluate fenBefore normally
 			var err error
-			evalBefore, err = engine.EvaluateFEN(ctx, fenBefore, depth)
+			evalBefore, err = engine.EvaluateFEN(ctx, fenBefore, depth, maxTimeMs)
 			if err != nil {
 				log.Warn("eval before move %d failed: %v", i+1, err)
 				continue
@@ -198,7 +208,7 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		}
 
 		// Always evaluate fenAfter
-		evalAfter, err := engine.EvaluateFEN(ctx, fenAfter, depth)
+		evalAfter, err := engine.EvaluateFEN(ctx, fenAfter, depth, maxTimeMs)
 		if err != nil {
 			log.Warn("eval after move %d failed: %v", i+1, err)
 			continue
