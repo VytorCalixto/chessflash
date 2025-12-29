@@ -1,6 +1,12 @@
 package analysis
 
-func ClassifyMove(evalBefore, evalAfter float64, isWhiteMove bool) string {
+func ClassifyMove(evalBefore, evalAfter float64, isWhiteMove bool, movePlayed, bestMove string) string {
+	// If the played move matches the best move, it's always "good"
+	// This prevents classifying best moves as mistakes/blunders in losing positions
+	if movePlayed != "" && bestMove != "" && movePlayed == bestMove {
+		return "good"
+	}
+
 	diff := evalAfter - evalBefore
 
 	// Stockfish evaluates from white's perspective
