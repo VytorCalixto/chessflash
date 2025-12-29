@@ -249,6 +249,11 @@ func (p *Pool) QueueSize() int {
 	return len(p.jobs)
 }
 
+// QueueCapacity returns the maximum capacity of the queue.
+func (p *Pool) QueueCapacity() int {
+	return p.queue
+}
+
 // WorkerCount returns the number of workers in the pool.
 func (p *Pool) WorkerCount() int {
 	return p.workers

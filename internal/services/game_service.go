@@ -224,16 +224,39 @@ func (s *gameService) QueueGamesForAnalysis(ctx context.Context, filter models.A
 	}
 
 	queuedCount := 0
+	rejectedCount := 0
 	for _, g := range games {
 		if err := s.jobQueue.EnqueueAnalysis(g.ID); err != nil {
+			if err.Error() == "job queue is full" {
+				rejectedCount++
+			}
 			log.Warn("failed to enqueue analysis for game %d: %v", g.ID, err)
 		} else {
 			queuedCount++
 		}
 	}
 
-	log.Info("queued %d games for analysis", queuedCount)
+	log.Info("queued %d games for analysis (rejected: %d)", queuedCount, rejectedCount)
+
+	// Start automatic backfill if there were rejected games or if we have more games to process
+	if rejectedCount > 0 || len(games) > queuedCount {
+		if backfillQueue, ok := s.jobQueue.(interface {
+			StartBackfill(models.AnalysisFilter)
+		}); ok {
+			backfillQueue.StartBackfill(filter)
+		}
+	}
+
 	return queuedCount, nil
+}
+
+// StopBackfill stops the automatic backfill process if it's running
+func (s *gameService) StopBackfill() {
+	if backfillQueue, ok := s.jobQueue.(interface {
+		StopBackfill()
+	}); ok {
+		backfillQueue.StopBackfill()
+	}
 }
 
 func (s *gameService) CountGamesByStatusWithFilter(ctx context.Context, profileID int64, status string, filter models.AnalysisFilter) (int, error) {

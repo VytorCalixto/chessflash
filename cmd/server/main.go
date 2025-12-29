@@ -127,6 +127,7 @@ func main() {
 		cfg.StockfishDepth,
 		cfg.ArchiveLimit,
 		cfg.MaxConcurrentArchive,
+		gameRepo,
 	)
 
 	gameService := services.NewGameService(gameRepo, positionRepo, jobQueue, database)

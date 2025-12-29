@@ -67,6 +67,14 @@ func (s *Server) handleStopAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("stopping background analysis")
 	s.AnalysisPool.Cancel()
+	
+	// Stop backfill if it's running
+	if backfillService, ok := s.GameService.(interface {
+		StopBackfill()
+	}); ok {
+		backfillService.StopBackfill()
+	}
+	
 	log.Info("background analysis stopped")
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
