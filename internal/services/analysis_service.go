@@ -157,6 +157,9 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 
 	var blunders, mistakes, inaccuracies int
 	var flashcardsCreated int
+	var prevEval *analysis.EvalResult
+	var positionsToInsert []models.Position
+	var flashcardIndices []int // Track which positions need flashcards (indices in positionsToInsert)
 
 	for i := 0; i < len(moves); i++ {
 		if i >= len(positions)-1 {
@@ -180,16 +183,28 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		log.Debug("fen before: %s", fenBefore)
 		log.Debug("fen after: %s", fenAfter)
 
-		evalBefore, err := engine.EvaluateFEN(ctx, fenBefore, depth)
-		if err != nil {
-			log.Warn("eval before move %d failed: %v", i+1, err)
-			continue
+		// Reuse previous evaluation for evalBefore (the "after" position of move i-1 is the "before" position of move i)
+		var evalBefore analysis.EvalResult
+		if prevEval != nil {
+			evalBefore = *prevEval
+		} else {
+			// First move: evaluate fenBefore normally
+			var err error
+			evalBefore, err = engine.EvaluateFEN(ctx, fenBefore, depth)
+			if err != nil {
+				log.Warn("eval before move %d failed: %v", i+1, err)
+				continue
+			}
 		}
+
+		// Always evaluate fenAfter
 		evalAfter, err := engine.EvaluateFEN(ctx, fenAfter, depth)
 		if err != nil {
 			log.Warn("eval after move %d failed: %v", i+1, err)
 			continue
 		}
+		// Store evalAfter as prevEval for the next iteration
+		prevEval = &evalAfter
 
 		// Normalize evaluation values for storage
 		var mateBefore *int
@@ -222,7 +237,8 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 			inaccuracies++
 		}
 
-		posID, err := s.positionRepo.Insert(ctx, models.Position{
+		// Collect position for batch insert
+		position := models.Position{
 			GameID:         game.ID,
 			MoveNumber:     i + 1,
 			FEN:            fenBefore,
@@ -234,21 +250,29 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 			MateBefore:     mateBefore,
 			MateAfter:      mateAfter,
 			Classification: classification,
-		})
-		if err != nil {
-			log.Warn("failed to insert position for move %d: %v", i+1, err)
-			continue
 		}
+		positionsToInsert = append(positionsToInsert, position)
 
-		// Only create flashcards for moves made by the user (i even -> white, i odd -> black)
+		// Track which positions need flashcards (only for player moves with blunders/mistakes)
 		isPlayerMove := isWhiteMove == userIsWhite
-		if !isPlayerMove {
-			continue
+		if isPlayerMove && (classification == "blunder" || classification == "mistake") {
+			flashcardIndices = append(flashcardIndices, len(positionsToInsert)-1)
 		}
+	}
 
-		if classification == "blunder" || classification == "mistake" {
+	// Batch insert all positions
+	positionIDs, err := s.positionRepo.InsertBatch(ctx, positionsToInsert)
+	if err != nil {
+		log.Error("failed to batch insert positions: %v", err)
+		_ = s.gameRepo.UpdateStatus(ctx, gameID, "failed")
+		return err
+	}
+
+	// Create flashcards for positions that need them
+	for _, idx := range flashcardIndices {
+		if idx < len(positionIDs) {
 			card := models.Flashcard{
-				PositionID:    posID,
+				PositionID:    positionIDs[idx],
 				DueAt:         time.Now(),
 				IntervalDays:  0,
 				EaseFactor:    2.5,
@@ -256,7 +280,7 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 				TimesCorrect:  0,
 			}
 			if _, err := s.flashcardRepo.Insert(ctx, card); err != nil {
-				log.Warn("failed to insert flashcard for position %d: %v", posID, err)
+				log.Warn("failed to insert flashcard for position %d: %v", positionIDs[idx], err)
 			} else {
 				flashcardsCreated++
 				log.Debug("flashcard created: %+v", card)

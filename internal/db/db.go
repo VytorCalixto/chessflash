@@ -23,7 +23,7 @@ type DB struct {
 func Open(path string) (*DB, error) {
 	log := logger.Default().WithPrefix("db")
 
-	dsn := fmt.Sprintf("%s?_busy_timeout=5000&_foreign_keys=on", path)
+	dsn := fmt.Sprintf("%s?_busy_timeout=5000&_foreign_keys=on&_journal_mode=WAL&_synchronous=NORMAL", path)
 	log.Info("opening database: %s", path)
 
 	sqlDB, err := sql.Open("sqlite3", dsn)

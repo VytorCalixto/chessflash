@@ -59,36 +59,37 @@ func (db *DB) RefreshProfileStats(ctx context.Context, profileID int64) error {
 	log := logger.FromContext(ctx).WithPrefix("db")
 	log.Debug("refreshing cached stats: profile_id=%d", profileID)
 
-	if err := db.refreshOpeningStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshOpponentStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshTimeClassStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshColorStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshMonthlyStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshMistakePhaseStats(ctx, profileID); err != nil {
-		return err
-	}
-	if err := db.refreshRatingStats(ctx, profileID); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (db *DB) refreshOpeningStats(ctx context.Context, profileID int64) error {
 	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM opening_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		if err := db.refreshOpeningStatsTx(ctx, tx, profileID); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `
+		if err := db.refreshOpponentStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		if err := db.refreshTimeClassStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		if err := db.refreshColorStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		if err := db.refreshMonthlyStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		if err := db.refreshMistakePhaseStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		if err := db.refreshRatingStatsTx(ctx, tx, profileID); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (db *DB) refreshOpeningStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM opening_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO opening_stats_cache (profile_id, opening_name, eco_code, total_games, wins, draws, losses, win_rate, avg_blunders)
 SELECT g.profile_id,
        g.opening_name,
@@ -109,16 +110,14 @@ LEFT JOIN (
 WHERE g.profile_id = ? AND g.opening_name IS NOT NULL AND g.opening_name != ''
 GROUP BY g.profile_id, g.opening_name
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshOpponentStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM opponent_stats_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshOpponentStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM opponent_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO opponent_stats_cache (profile_id, opponent, total_games, wins, draws, losses, win_rate, avg_opponent_rating, last_played_at)
 SELECT g.profile_id,
        g.opponent,
@@ -133,16 +132,14 @@ FROM games g
 WHERE g.profile_id = ?
 GROUP BY g.profile_id, g.opponent
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshTimeClassStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM time_class_stats_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshTimeClassStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM time_class_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO time_class_stats_cache (profile_id, time_class, total_games, wins, draws, losses, win_rate, avg_blunders, avg_game_length)
 SELECT g.profile_id,
        g.time_class,
@@ -168,16 +165,14 @@ LEFT JOIN (
 WHERE g.profile_id = ?
 GROUP BY g.profile_id, g.time_class
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshColorStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM color_stats_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshColorStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM color_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO color_stats_cache (profile_id, played_as, total_games, wins, draws, losses, win_rate, avg_blunders)
 SELECT g.profile_id,
        g.played_as,
@@ -197,16 +192,14 @@ LEFT JOIN (
 WHERE g.profile_id = ?
 GROUP BY g.profile_id, g.played_as
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshMonthlyStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM monthly_stats_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshMonthlyStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM monthly_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO monthly_stats_cache (profile_id, year_month, total_games, wins, draws, losses, win_rate, total_blunders, blunder_rate, avg_rating)
 SELECT g.profile_id,
        strftime('%Y-%m', g.played_at) AS year_month,
@@ -228,16 +221,14 @@ LEFT JOIN (
 WHERE g.profile_id = ?
 GROUP BY g.profile_id, year_month
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshMistakePhaseStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM mistake_phase_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshMistakePhaseStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM mistake_phase_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO mistake_phase_cache (profile_id, phase, classification, count, avg_eval_loss)
 SELECT g.profile_id,
        CASE
@@ -253,16 +244,14 @@ JOIN games g ON g.id = p.game_id
 WHERE g.profile_id = ?
 GROUP BY g.profile_id, phase, p.classification
 `, profileID)
-		return err
-	})
+	return err
 }
 
-func (db *DB) refreshRatingStats(ctx context.Context, profileID int64) error {
-	return tx(ctx, db, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM rating_stats_cache WHERE profile_id = ?`, profileID); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `
+func (db *DB) refreshRatingStatsTx(ctx context.Context, tx *sql.Tx, profileID int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rating_stats_cache WHERE profile_id = ?`, profileID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO rating_stats_cache (profile_id, time_class, min_rating, max_rating, avg_rating, current_rating, rating_change, games_tracked)
 SELECT g.profile_id,
        g.time_class,
@@ -297,8 +286,7 @@ FROM games g
 WHERE g.profile_id = ? AND g.player_rating IS NOT NULL
 GROUP BY g.profile_id, g.time_class
 `, profileID)
-		return err
-	})
+	return err
 }
 
 func (db *DB) OpponentStats(ctx context.Context, profileID int64, limit, offset int, orderBy, orderDir string) ([]models.OpponentStat, error) {

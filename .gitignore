@@ -3,4 +3,4 @@ stockfish-ubuntu-x86-64-avx2
 .cursor
 *.txt
 *.db
-*.db-journal
+*.db-*
