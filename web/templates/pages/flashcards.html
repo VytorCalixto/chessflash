@@ -188,9 +188,18 @@
     const evalDiff = parseFloat({{printf "%.2f" .card.EvalDiff}}) / 100;
     const classification = "{{.card.Classification}}".toLowerCase();
     const movePlayed = "{{.card.MovePlayed}}";
+    const prevMovePlayed = "{{.card.PrevMovePlayed}}";
     const whitePlayer = "{{.card.WhitePlayer}}";
     const blackPlayer = "{{.card.BlackPlayer}}";
     console.log("Player names:", { whitePlayer, blackPlayer });
+
+    // Parse the last move for highlighting (opponent's move that led to this position)
+    let lastMove = null;
+    if (prevMovePlayed && prevMovePlayed.length >= 4) {
+      const from = prevMovePlayed.substring(0, 2);
+      const to = prevMovePlayed.substring(2, 4);
+      lastMove = [from, to];
+    }
 
     const promptEl = document.getElementById("prompt-text");
     const feedbackEl = document.getElementById("feedback-text");
@@ -314,6 +323,7 @@
         fen: fen,
         orientation: sideToMove,
         turnColor: sideToMove,
+        lastMove: lastMove,
         movable: {
           free: false,
           color: sideToMove,

@@ -84,20 +84,23 @@ func (db *DB) FlashcardWithPosition(ctx context.Context, id int64, profileID int
 	log.Debug("fetching flashcard with position: id=%d, profile_id=%d", id, profileID)
 
 	var fp models.FlashcardWithPosition
+	var prevMovePlayed sql.NullString
 	err := db.QueryRowContext(ctx, `
 SELECT 
     f.id, f.position_id, f.due_at, f.interval_days, f.ease_factor, f.times_reviewed, f.times_correct, f.created_at,
     p.game_id, p.move_number, p.fen, p.move_played, p.best_move, p.eval_before, p.eval_after, p.eval_diff, p.mate_before, p.mate_after, p.classification,
     CASE WHEN g.played_as = 'white' THEN pr.username ELSE g.opponent END AS white_player,
-    CASE WHEN g.played_as = 'black' THEN pr.username ELSE g.opponent END AS black_player
+    CASE WHEN g.played_as = 'black' THEN pr.username ELSE g.opponent END AS black_player,
+    prev_p.move_played AS prev_move_played
 FROM flashcards f
 JOIN positions p ON p.id = f.position_id
 JOIN games g ON g.id = p.game_id
 JOIN profiles pr ON pr.id = g.profile_id
+LEFT JOIN positions prev_p ON prev_p.game_id = p.game_id AND prev_p.move_number = p.move_number - 1
 WHERE f.id = ? AND g.profile_id = ?
 `, id, profileID).Scan(&fp.ID, &fp.PositionID, &fp.DueAt, &fp.IntervalDays, &fp.EaseFactor, &fp.TimesReviewed, &fp.TimesCorrect, &fp.CreatedAt,
 		&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.MateBefore, &fp.MateAfter, &fp.Classification,
-		&fp.WhitePlayer, &fp.BlackPlayer)
+		&fp.WhitePlayer, &fp.BlackPlayer, &prevMovePlayed)
 	if errors.Is(err, sql.ErrNoRows) {
 		log.Debug("flashcard not found: id=%d", id)
 		return nil, nil
@@ -105,6 +108,9 @@ WHERE f.id = ? AND g.profile_id = ?
 	if err != nil {
 		log.Error("failed to get flashcard with position: %v", err)
 		return nil, err
+	}
+	if prevMovePlayed.Valid {
+		fp.PrevMovePlayed = prevMovePlayed.String
 	}
 	log.Debug("flashcard found: position_id=%d, classification=%s", fp.PositionID, fp.Classification)
 	return &fp, nil

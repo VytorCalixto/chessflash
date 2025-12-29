@@ -73,6 +73,7 @@ type FlashcardWithPosition struct {
 	MoveNumber     int     `json:"move_number"`
 	FEN            string  `json:"fen"`
 	MovePlayed     string  `json:"move_played"`
+	PrevMovePlayed string  `json:"prev_move_played"`
 	BestMove       string  `json:"best_move"`
 	EvalBefore     float64 `json:"eval_before"`
 	EvalAfter      float64 `json:"eval_after"`
@@ -203,9 +204,9 @@ type FlashcardOpeningStat struct {
 }
 
 type FlashcardTimeStat struct {
-	AvgTimeSeconds    float64          `json:"avg_time_seconds"`
-	MedianTimeSeconds float64          `json:"median_time_seconds"`
-	FastestTime       float64          `json:"fastest_time"`
-	SlowestTime       float64          `json:"slowest_time"`
-	TimeByQuality     map[int]float64  `json:"time_by_quality"`
+	AvgTimeSeconds    float64         `json:"avg_time_seconds"`
+	MedianTimeSeconds float64         `json:"median_time_seconds"`
+	FastestTime       float64         `json:"fastest_time"`
+	SlowestTime       float64         `json:"slowest_time"`
+	TimeByQuality     map[int]float64 `json:"time_by_quality"`
 }
