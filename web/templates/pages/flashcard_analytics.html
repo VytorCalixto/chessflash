@@ -1,201 +1,334 @@
 {{define "pages/flashcard_analytics.html"}}
 {{template "head" .}}
-<h1 class="title is-4">Flashcard Analytics</h1>
+<div class="level">
+  <div class="level-left">
+    <div class="level-item">
+      <h1 class="title is-4">Flashcard Analytics</h1>
+    </div>
+  </div>
+  <div class="level-right">
+    <div class="level-item">
+      <form method="POST" action="/analytics/refresh" style="display: inline;">
+        <input type="hidden" name="redirect" value="/flashcards/analytics">
+        <button type="submit" class="button is-small">
+          <span class="icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.425A6 6 0 1 1 8 2v1z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+          </span>
+          <span>Refresh</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 <p class="subtitle is-6">Profile: {{if .profile}}{{.profile.Username}}{{else}}unknown{{end}}</p>
 
 {{if .overall_stats}}
+<!-- Summary Dashboard Cards -->
 <div class="columns is-multiline mt-4">
-  <!-- Overall Stats Cards -->
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Total Cards</p>
-        <p class="title is-3">{{.overall_stats.TotalCards}}</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Total Cards</p>
+      <p class="title is-3">{{.overall_stats.TotalCards}}</p>
     </div>
   </div>
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Total Reviews</p>
-        <p class="title is-3">{{.overall_stats.TotalReviews}}</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Total Reviews</p>
+      <p class="title is-3">{{.overall_stats.TotalReviews}}</p>
     </div>
   </div>
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Overall Accuracy</p>
-        <p class="title is-3">{{printf "%.1f" .overall_stats.OverallAccuracy}}%</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Overall Accuracy</p>
+      <p class="title is-3">{{printf "%.1f" .overall_stats.OverallAccuracy}}%</p>
     </div>
   </div>
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Cards Mastered</p>
-        <p class="title is-3">{{.overall_stats.CardsMastered}}</p>
-        <p class="help">Ease > 2.5, Interval > 30 days</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Cards Mastered</p>
+      <p class="title is-3">{{.overall_stats.CardsMastered}}</p>
+      <p class="subtitle is-7 mt-1">Ease > 2.5, Interval > 30 days</p>
     </div>
   </div>
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Cards Struggling</p>
-        <p class="title is-3">{{.overall_stats.CardsStruggling}}</p>
-        <p class="help">Ease < 2.0, Reviewed > 3 times</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Cards Struggling</p>
+      <p class="title is-3">{{.overall_stats.CardsStruggling}}</p>
+      <p class="subtitle is-7 mt-1">Ease < 2.0, Reviewed > 3 times</p>
     </div>
   </div>
-  <div class="column is-one-third">
-    <div class="card">
-      <div class="card-content">
-        <p class="heading">Cards Due Now</p>
-        <p class="title is-3">{{.overall_stats.CardsDue}}</p>
-        <p class="help">{{.overall_stats.CardsDueSoon}} due in next 7 days</p>
-      </div>
+  <div class="column is-one-quarter">
+    <div class="box has-text-centered">
+      <p class="heading">Cards Due Now</p>
+      <p class="title is-3">{{.overall_stats.CardsDue}}</p>
+      <p class="subtitle is-7 mt-1">{{.overall_stats.CardsDueSoon}} due in next 7 days</p>
     </div>
   </div>
 </div>
 
+<!-- Time Statistics -->
 {{if .time_stats}}
-<h2 class="title is-5 mt-5">Time Statistics</h2>
-<div class="columns is-multiline mt-2">
-  <div class="column is-one-quarter">
-    <div class="box">
-      <p class="heading">Average Time</p>
-      <p class="title is-4">{{printf "%.1f" .time_stats.AvgTimeSeconds}}s</p>
-    </div>
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">⏱️</span>
+      Time Statistics
+    </p>
   </div>
-  <div class="column is-one-quarter">
-    <div class="box">
-      <p class="heading">Median Time</p>
-      <p class="title is-4">{{printf "%.1f" .time_stats.MedianTimeSeconds}}s</p>
+  <div class="card-content">
+    <div class="columns is-multiline">
+      <div class="column is-one-quarter">
+        <div class="box has-text-centered">
+          <p class="heading">Average Time</p>
+          <p class="title is-4">{{printf "%.1f" .time_stats.AvgTimeSeconds}}s</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="box has-text-centered">
+          <p class="heading">Median Time</p>
+          <p class="title is-4">{{printf "%.1f" .time_stats.MedianTimeSeconds}}s</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="box has-text-centered">
+          <p class="heading">Fastest</p>
+          <p class="title is-4">{{printf "%.1f" .time_stats.FastestTime}}s</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="box has-text-centered">
+          <p class="heading">Slowest</p>
+          <p class="title is-4">{{printf "%.1f" .time_stats.SlowestTime}}s</p>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="column is-one-quarter">
-    <div class="box">
-      <p class="heading">Fastest</p>
-      <p class="title is-4">{{printf "%.1f" .time_stats.FastestTime}}s</p>
+    {{if .time_stats.TimeByQuality}}
+    <div class="table-container mt-4">
+      <p class="heading mb-3">Average Time by Quality</p>
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Quality</th>
+            <th>Average Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range $quality, $time := .time_stats.TimeByQuality}}
+          <tr>
+            <td>
+              <span class="tag {{if eq $quality 0}}is-danger{{else if eq $quality 1}}is-warning{{else if eq $quality 2}}is-info{{else}}is-success{{end}}">
+                {{if eq $quality 0}}Again{{else if eq $quality 1}}Hard{{else if eq $quality 2}}Good{{else}}Easy{{end}}
+              </span>
+            </td>
+            <td><strong>{{printf "%.1f" $time}}s</strong></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
     </div>
+    {{end}}
   </div>
-  <div class="column is-one-quarter">
-    <div class="box">
-      <p class="heading">Slowest</p>
-      <p class="title is-4">{{printf "%.1f" .time_stats.SlowestTime}}s</p>
+</div>
+{{end}}
+
+<!-- Performance by Mistake Type -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">📊</span>
+      Performance by Mistake Type
+    </p>
+  </div>
+  <div class="card-content">
+    <div class="table-container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Cards</th>
+            <th>Reviews</th>
+            <th>Accuracy</th>
+            <th>Avg Ease</th>
+            <th>Avg Reviews Needed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .classification_stats}}
+          <tr>
+            <td>
+              <span class="tag {{if eq .Classification "blunder"}}is-danger{{else if eq .Classification "mistake"}}is-warning{{else}}is-info{{end}}">
+                <strong>{{.Classification}}</strong>
+              </span>
+            </td>
+            <td>{{.TotalCards}}</td>
+            <td>{{.TotalReviews}}</td>
+            <td>
+              <span class="tag {{if ge .AvgAccuracy 85.0}}is-success{{else if ge .AvgAccuracy 70.0}}is-warning{{else}}is-danger{{end}}">
+                {{printf "%.1f" .AvgAccuracy}}%
+              </span>
+              <progress class="progress is-small {{if ge .AvgAccuracy 85.0}}is-success{{else if ge .AvgAccuracy 70.0}}is-warning{{else}}is-danger{{end}}" value="{{.AvgAccuracy}}" max="100" style="width: 80px; margin-left: 8px; display: inline-block;">{{printf "%.1f" .AvgAccuracy}}%</progress>
+            </td>
+            <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+            <td>{{printf "%.1f" .AvgReviewsNeeded}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
-{{if .time_stats.TimeByQuality}}
-<div class="box mt-2">
-  <p class="heading mb-3">Average Time by Quality</p>
-  <table class="table is-narrow">
-    <thead>
-      <tr>
-        <th>Quality</th>
-        <th>Average Time</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range $quality, $time := .time_stats.TimeByQuality}}
-      <tr>
-        <td>
-          {{if eq $quality 0}}Again{{else if eq $quality 1}}Hard{{else if eq $quality 2}}Good{{else if eq $quality 3}}Easy{{end}}
-        </td>
-        <td>{{printf "%.1f" $time}}s</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+
+<!-- Performance by Game Phase -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">🎯</span>
+      Performance by Game Phase
+    </p>
+  </div>
+  <div class="card-content">
+    <div class="table-container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Cards</th>
+            <th>Reviews</th>
+            <th>Accuracy</th>
+            <th>Avg Ease</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .phase_stats}}
+          <tr>
+            <td><strong>{{.Phase}}</strong></td>
+            <td>{{.TotalCards}}</td>
+            <td>{{.TotalReviews}}</td>
+            <td>
+              <span class="tag {{if ge .AvgAccuracy 85.0}}is-success{{else if ge .AvgAccuracy 70.0}}is-warning{{else}}is-danger{{end}}">
+                {{printf "%.1f" .AvgAccuracy}}%
+              </span>
+              <progress class="progress is-small {{if ge .AvgAccuracy 85.0}}is-success{{else if ge .AvgAccuracy 70.0}}is-warning{{else}}is-danger{{end}}" value="{{.AvgAccuracy}}" max="100" style="width: 80px; margin-left: 8px; display: inline-block;">{{printf "%.1f" .AvgAccuracy}}%</progress>
+            </td>
+            <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="5">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
-{{end}}
-{{end}}
 
-<h2 class="title is-5 mt-5">Performance by Mistake Type</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Type</th>
-      <th>Cards</th>
-      <th>Reviews</th>
-      <th>Accuracy</th>
-      <th>Avg Ease</th>
-      <th>Avg Reviews Needed</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .classification_stats}}
-    <tr>
-      <td><strong>{{.Classification}}</strong></td>
-      <td>{{.TotalCards}}</td>
-      <td>{{.TotalReviews}}</td>
-      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
-      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
-      <td>{{printf "%.1f" .AvgReviewsNeeded}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="6">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
-
-<h2 class="title is-5 mt-5">Performance by Game Phase</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Phase</th>
-      <th>Cards</th>
-      <th>Reviews</th>
-      <th>Accuracy</th>
-      <th>Avg Ease</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .phase_stats}}
-    <tr>
-      <td><strong>{{.Phase}}</strong></td>
-      <td>{{.TotalCards}}</td>
-      <td>{{.TotalReviews}}</td>
-      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
-      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="5">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
-
-<h2 class="title is-5 mt-5">Performance by Opening</h2>
-<table class="table is-striped is-fullwidth">
-  <thead>
-    <tr>
-      <th>Opening</th>
-      <th>ECO</th>
-      <th>Cards</th>
-      <th>Reviews</th>
-      <th>Accuracy</th>
-      <th>Avg Ease</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .opening_stats}}
-    <tr>
-      <td>{{.OpeningName}}</td>
-      <td>{{.ECOCode}}</td>
-      <td>{{.TotalCards}}</td>
-      <td>{{.TotalReviews}}</td>
-      <td>{{printf "%.1f" .AvgAccuracy}}%</td>
-      <td>{{printf "%.2f" .AvgEaseFactor}}</td>
-    </tr>
-    {{else}}
-    <tr><td colspan="6">No data yet.</td></tr>
-    {{end}}
-  </tbody>
-</table>
+<!-- Performance by Opening -->
+<div class="card mt-4">
+  <div class="card-header">
+    <p class="card-header-title">
+      <span class="icon mr-2">♟️</span>
+      Performance by Opening
+    </p>
+    <button class="card-header-icon" aria-label="toggle table" onclick="toggleOpeningTable()">
+      <span class="icon" id="openingToggleIcon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+        </svg>
+      </span>
+    </button>
+  </div>
+  <div class="card-content">
+    <div class="table-container" id="openingTableSection">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>Opening</th>
+            <th>ECO</th>
+            <th>Cards</th>
+            <th>Reviews</th>
+            <th>Accuracy</th>
+            <th>Avg Ease</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .opening_stats}}
+          <tr>
+            <td>{{.OpeningName}}</td>
+            <td><code>{{.ECOCode}}</code></td>
+            <td>{{.TotalCards}}</td>
+            <td>{{.TotalReviews}}</td>
+            <td>
+              <span class="tag {{if ge .AvgAccuracy 85.0}}is-success{{else if ge .AvgAccuracy 70.0}}is-warning{{else}}is-danger{{end}}">
+                {{printf "%.1f" .AvgAccuracy}}%
+              </span>
+            </td>
+            <td>{{printf "%.2f" .AvgEaseFactor}}</td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6">No data yet.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {{else}}
-<p>No flashcard data available yet. Start reviewing flashcards to see analytics!</p>
+<div class="notification is-info mt-4">
+  <p>No flashcard data available yet. Start reviewing flashcards to see analytics!</p>
+</div>
 {{end}}
+
+<script>
+function toggleOpeningTable() {
+  const section = document.getElementById('openingTableSection');
+  const icon = document.getElementById('openingToggleIcon');
+  if (section.style.maxHeight === '400px' || section.style.maxHeight === '') {
+    section.style.maxHeight = 'none';
+    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/></svg>';
+  } else {
+    section.style.maxHeight = '400px';
+    section.style.overflowY = 'auto';
+    icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>';
+  }
+}
+</script>
+
+<style>
+.progress {
+  width: 80px;
+  margin-left: 8px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.table-container {
+  overflow-x: auto;
+}
+#openingTableSection {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.card-header-icon {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.75rem;
+}
+.card-header-icon:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+@media (max-width: 768px) {
+  .columns.is-multiline .column.is-one-quarter {
+    width: 50%;
+  }
+  .progress {
+    width: 60px;
+  }
+}
+</style>
 
 {{template "foot" .}}
 {{end}}
