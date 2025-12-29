@@ -91,7 +91,8 @@ SELECT
     p.game_id, p.move_number, p.fen, p.move_played, p.best_move, p.eval_before, p.eval_after, p.eval_diff, p.mate_before, p.mate_after, p.classification,
     CASE WHEN g.played_as = 'white' THEN pr.username ELSE g.opponent END AS white_player,
     CASE WHEN g.played_as = 'black' THEN pr.username ELSE g.opponent END AS black_player,
-    prev_p.move_played AS prev_move_played
+    prev_p.move_played AS prev_move_played,
+    g.player_rating, g.opponent_rating, g.played_at, g.time_class
 FROM flashcards f
 JOIN positions p ON p.id = f.position_id
 JOIN games g ON g.id = p.game_id
@@ -100,7 +101,8 @@ LEFT JOIN positions prev_p ON prev_p.game_id = p.game_id AND prev_p.move_number 
 WHERE f.id = ? AND g.profile_id = ?
 `, id, profileID).Scan(&fp.ID, &fp.PositionID, &fp.DueAt, &fp.IntervalDays, &fp.EaseFactor, &fp.TimesReviewed, &fp.TimesCorrect, &fp.CreatedAt,
 		&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.MateBefore, &fp.MateAfter, &fp.Classification,
-		&fp.WhitePlayer, &fp.BlackPlayer, &prevMovePlayed)
+		&fp.WhitePlayer, &fp.BlackPlayer, &prevMovePlayed,
+		&fp.PlayerRating, &fp.OpponentRating, &fp.PlayedAt, &fp.TimeClass)
 	if errors.Is(err, sql.ErrNoRows) {
 		log.Debug("flashcard not found: id=%d", id)
 		return nil, nil

@@ -125,7 +125,8 @@
 <div class="flashcard-layout">
   <div>
     <div class="mb-2 has-text-grey is-size-7">
-      Move #{{.card.MoveNumber}} &nbsp;|&nbsp; Classification: {{.card.Classification}} &nbsp;|&nbsp; Played: {{.card.MovePlayed}} &nbsp;|&nbsp; White: {{.card.WhitePlayer}} vs Black: {{.card.BlackPlayer}}
+      Move #{{.card.MoveNumber}} &nbsp;|&nbsp; Classification: {{.card.Classification}} &nbsp;|&nbsp; Played: {{.card.MovePlayed}} &nbsp;|&nbsp; White: {{.card.WhitePlayer}} vs Black: {{.card.BlackPlayer}}<br>
+      Player Rating: {{.card.PlayerRating}} | Opponent Rating: {{.card.OpponentRating}} | Date: {{.card.PlayedAt.Format "2006-01-02"}} | Time Format: {{.card.TimeClass}}
     </div>
     <div class="player-info" id="player-top">
       <span class="piece-icon" id="icon-top"></span>

@@ -188,6 +188,8 @@
     <div class="info-box">
       <div><strong>Opening:</strong> {{.game.OpeningName}} ({{.game.ECOCode}})</div>
       <div><strong>Result:</strong> {{.game.Result}} | <strong>Played as:</strong> {{.game.PlayedAs}}</div>
+      <div><strong>Player Rating:</strong> {{.game.PlayerRating}} | <strong>Opponent Rating:</strong> {{.game.OpponentRating}}</div>
+      <div><strong>Date:</strong> {{.game.PlayedAt.Format "2006-01-02"}} | <strong>Time Format:</strong> {{.game.TimeClass}}</div>
     </div>
     <div class="move-list-header">
       <h2 class="title is-5 mb-0">Moves</h2>
