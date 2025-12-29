@@ -1,148 +1,16 @@
 {{define "pages/game_detail.html"}}
 {{template "head" .}}
 <style>
+  /* Page-specific styles */
   .analysis-layout {
     display: grid;
     grid-template-columns: minmax(520px, 1fr) minmax(320px, 360px);
     gap: 1.5rem;
   }
-  .board-area {
-    display: flex;
-    gap: 0.75rem;
-    align-items: stretch;
-  }
-  .board-wrapper {
-    width: 480px;
-    height: 480px;
-    max-width: 100%;
-  }
-  .cg-wrap { width: 100%; height: 100%; }
-  .eval-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 32px;
-    flex-shrink: 0;
-    margin-right: 4px;
-  }
-  .eval-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding: 4px 5px;
-    width: 100%;
-    text-align: center;
-    box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-bottom: none;
-  }
-  .eval-label.white-advantage { background: #fff; color: #222; }
-  .eval-label.black-advantage { background: #262421; color: #fff; border-color: #262421; }
-  .eval-track {
-    position: relative;
-    width: 100%;
-    height: 480px;
-    overflow: hidden;
-    background: #262421;
-    border: 1px solid #262421;
-    box-sizing: border-box;
-  }
-  .eval-fill {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: #fff;
-    transition: height 0.25s ease;
-  }
-  .nav-buttons {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-  .nav-buttons .button { min-width: 44px; }
-  .move-list {
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    max-height: 520px;
-    overflow-y: auto;
-  }
-  .move-row {
-    display: grid;
-    grid-template-columns: 52px 1fr 1fr;
-    align-items: center;
-    padding: 6px 8px;
-    gap: 6px;
-    border-bottom: 1px solid #f1f1f1;
-  }
-  .move-row:nth-child(2n) { background: #fafafa; }
-  .move-num { font-weight: 700; color: #555; }
-  .move-cell {
-    padding: 6px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    border: 1px solid transparent;
-  }
-  .move-cell .tags { font-size: 0.75rem; }
-  .move-cell .small-note { font-size: 0.75rem; color: #666; }
-  .move-cell.active { border-color: #485fc7; box-shadow: 0 0 0 1px #485fc7 inset; }
-  .tag.is-blunder { background: #f14668; color: #fff; }
-  .tag.is-mistake { background: #ff9f1c; color: #222; }
-  .tag.is-inaccuracy { background: #ffe08a; color: #222; }
-  .tag.is-good { background: #48c78e; color: #fff; }
-  .best-move-note { font-size: 0.85rem; color: #555; margin-top: 0.4rem; }
-  .player-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0;
-    font-size: 0.85rem;
-  }
-  .player-info .player-name {
-    font-weight: 600;
-  }
-  .player-info .piece-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 2px;
-  }
-  .player-info .piece-icon.white {
-    background: #fff;
-    border: 1px solid #ccc;
-  }
-  .player-info .piece-icon.black {
-    background: #262421;
-    border: 1px solid #262421;
-  }
-  .info-box {
-    border: 1px solid #e5e5e5;
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 0.75rem;
-  }
-  .move-list-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
+
   @media (max-width: 1080px) {
     .analysis-layout {
       grid-template-columns: 1fr;
-    }
-    .board-wrapper {
-      height: auto;
-      aspect-ratio: 1;
-    }
-    .eval-track {
-      height: 100%;
-      min-height: 320px;
     }
   }
 </style>
@@ -153,47 +21,72 @@
 {{if .positions}}
 <div class="analysis-layout">
   <div>
-    <div class="player-info" id="player-top">
-      <span class="piece-icon" id="icon-top"></span>
-      <span class="player-name" id="name-top"></span>
-    </div>
-    <div class="board-area">
-      <div class="eval-bar">
-        <div class="eval-label white-advantage" id="eval-label">+0.0</div>
-        <div class="eval-track">
-          <div class="eval-fill" id="eval-fill"></div>
+    <div class="board-container">
+      <div class="player-info" id="player-top">
+        <span class="piece-icon" id="icon-top"></span>
+        <span class="player-name" id="name-top"></span>
+        <span class="rating-badge" id="rating-top"></span>
+      </div>
+      <div class="board-area">
+        <div class="eval-bar">
+          <div class="eval-label white-advantage" id="eval-label">+0.0</div>
+          <div class="eval-track">
+            <div class="eval-fill" id="eval-fill"></div>
+          </div>
+        </div>
+        <div class="board-wrapper">
+          <div id="board"></div>
         </div>
       </div>
-      <div class="board-wrapper">
-        <div id="board"></div>
+      <div class="player-info" id="player-bottom">
+        <span class="piece-icon" id="icon-bottom"></span>
+        <span class="player-name" id="name-bottom"></span>
+        <span class="rating-badge" id="rating-bottom"></span>
       </div>
-    </div>
-    <div class="player-info" id="player-bottom">
-      <span class="piece-icon" id="icon-bottom"></span>
-      <span class="player-name" id="name-bottom"></span>
     </div>
     <div class="nav-buttons">
       <div class="buttons has-addons">
-        <button class="button is-small" data-action="first" title="First move">|&lt;</button>
-        <button class="button is-small" data-action="prev" title="Previous move">&lt;</button>
-        <button class="button is-small" data-action="next" title="Next move">&gt;</button>
-        <button class="button is-small" data-action="last" title="Last move">&gt;|</button>
+        <button class="button is-small" data-action="first" title="First move (Home)">⏮</button>
+        <button class="button is-small" data-action="prev" title="Previous move (←)">⏪</button>
+        <button class="button is-small" data-action="next" title="Next move (→)">⏩</button>
+        <button class="button is-small" data-action="last" title="Last move (End)">⏭</button>
       </div>
       <span id="move-status" class="has-text-weight-semibold">Move 1/{{len .positions}}</span>
+      <div class="auto-play-controls">
+        <button class="button is-small play-button" id="auto-play-btn" title="Auto-play (Space)">
+          <span id="play-icon">▶</span>
+        </button>
+        <input type="range" id="play-speed" class="play-speed-control" min="0.5" max="3" step="0.5" value="1" title="Playback speed">
+      </div>
+    </div>
+    <div class="move-progress">
+      <div class="move-progress-fill" id="move-progress"></div>
     </div>
     <div class="best-move-note" id="best-move-note">Best move: --</div>
   </div>
 
   <div>
     <div class="info-box">
-      <div><strong>Opening:</strong> {{.game.OpeningName}} ({{.game.ECOCode}})</div>
-      <div><strong>Result:</strong> {{.game.Result}} | <strong>Played as:</strong> {{.game.PlayedAs}}</div>
-      <div><strong>Player Rating:</strong> {{.game.PlayerRating}} | <strong>Opponent Rating:</strong> {{.game.OpponentRating}}</div>
-      <div><strong>Date:</strong> {{.game.PlayedAt.Format "2006-01-02"}} | <strong>Time Format:</strong> {{.game.TimeClass}}</div>
+      <div class="info-item">
+        <strong>Opening:</strong>
+        <span>{{.game.OpeningName}} ({{.game.ECOCode}})</span>
+      </div>
+      <div class="info-item">
+        <strong>Result:</strong>
+        <span>{{.game.Result}} | <strong>Played as:</strong> {{.game.PlayedAs}}</span>
+      </div>
+      <div class="info-item">
+        <strong>Player Rating:</strong>
+        <span>{{.game.PlayerRating}} | <strong>Opponent:</strong> {{.game.OpponentRating}}</span>
+      </div>
+      <div class="info-item">
+        <strong>Date:</strong>
+        <span>{{.game.PlayedAt.Format "2006-01-02"}} | <strong>Format:</strong> {{.game.TimeClass}}</span>
+      </div>
     </div>
     <div class="move-list-header">
       <h2 class="title is-5 mb-0">Moves</h2>
-      <span class="is-size-7 has-text-grey">Click a move or use ← →</span>
+      <span class="hint">Click a move or use ← →</span>
     </div>
     <div id="move-list" class="move-list"></div>
   </div>
@@ -229,14 +122,24 @@
   const profileUsername = "{{.profile.Username}}";
   const whitePlayer = playedAs === "white" ? profileUsername : opponent;
   const blackPlayer = playedAs === "black" ? profileUsername : opponent;
+  const whiteRating = playedAs === "white" ? {{.game.PlayerRating}} : {{.game.OpponentRating}};
+  const blackRating = playedAs === "black" ? {{.game.PlayerRating}} : {{.game.OpponentRating}};
+  
   const boardEl = document.getElementById("board");
   const evalFill = document.getElementById("eval-fill");
   const evalLabel = document.getElementById("eval-label");
   const moveStatus = document.getElementById("move-status");
   const bestMoveNote = document.getElementById("best-move-note");
   const moveListEl = document.getElementById("move-list");
+  const moveProgress = document.getElementById("move-progress");
+  const autoPlayBtn = document.getElementById("auto-play-btn");
+  const playIcon = document.getElementById("play-icon");
+  const playSpeed = document.getElementById("play-speed");
+  
   let currentIndex = 0;
   let cg;
+  let autoPlayInterval = null;
+  let isPlaying = false;
 
   function clampEval(val) {
     if (val > 10) return 10;
@@ -246,7 +149,6 @@
 
   function updateEvalBar(valPawns, mate) {
     if (mate !== null && mate !== undefined) {
-      // Mate: full bar, show M#
       evalFill.style.height = "100%";
       const mateDisplay = Math.abs(mate);
       const isWhiteMate = mate > 0;
@@ -268,6 +170,15 @@
     }
   }
 
+  function formatEvalDelta(evalDiff) {
+    const pawns = evalDiff / 100;
+    if (Math.abs(pawns) < 0.1) return null;
+    return {
+      value: pawns,
+      isPositive: pawns > 0
+    };
+  }
+
   function classForTag(cls) {
     switch ((cls || "").toLowerCase()) {
       case "blunder": return "is-blunder";
@@ -279,19 +190,32 @@
     }
   }
 
-  function inferMoveColor(fen) {
-    const parts = fen.split(" ");
-    if (parts.length < 2) return "white";
-    // FEN stores side to move. The move that was just played is the opposite color.
-    return parts[1] === "w" ? "black" : "white";
+  function classForCell(cls) {
+    switch ((cls || "").toLowerCase()) {
+      case "blunder": return "has-blunder";
+      case "mistake": return "has-mistake";
+      case "inaccuracy": return "has-inaccuracy";
+      case "good":
+      case "best": return "has-good";
+      default: return "";
+    }
   }
 
   function buildMoveRows() {
     const rows = new Map();
     positions.forEach((p, idx) => {
-      const color = inferMoveColor(p.fen);
-      const key = p.moveNumber;
-      if (!rows.has(key)) rows.set(key, { moveNumber: p.moveNumber });
+      // Convert stored move_number to chess move number
+      // Stored: 1=white1, 2=black1, 3=white2, 4=black2, etc.
+      // Chess: Move 1 = white1+black1, Move 2 = white2+black2, etc.
+      const chessMoveNumber = Math.ceil(p.moveNumber / 2);
+      
+      // Determine if this is a white or black move
+      // Odd move_number = white, even move_number = black
+      const isWhite = p.moveNumber % 2 === 1;
+      const color = isWhite ? "white" : "black";
+      
+      const key = chessMoveNumber;
+      if (!rows.has(key)) rows.set(key, { moveNumber: chessMoveNumber });
       const row = rows.get(key);
       row[color] = { ...p, idx };
     });
@@ -300,19 +224,30 @@
     Array.from(rows.values()).forEach(row => {
       const white = row.white;
       const black = row.black;
+      const whiteDelta = white ? formatEvalDelta(white.evalDiff) : null;
+      const blackDelta = black ? formatEvalDelta(black.evalDiff) : null;
+      const whiteIsBest = white && white.movePlayed === white.bestMove;
+      const blackIsBest = black && black.movePlayed === black.bestMove;
+      
       fragments.push(`
         <div class="move-row">
           <div class="move-num">${row.moveNumber}.</div>
-          <div class="move-cell ${white ? "" : "has-background-light"} ${white ? classForTag(white.classification) + " tag-wrapper" : ""}" data-idx="${white ? white.idx : ""}">
+          <div class="move-cell ${white ? "" : "has-background-light"} ${white ? classForCell(white.classification) + (whiteIsBest ? " is-best" : "") : ""}" data-idx="${white ? white.idx : ""}">
             ${white ? `
               <span>${white.movePlayed || "--"}</span>
-              <span class="tags"><span class="tag ${classForTag(white.classification)}">${(white.classification || "").charAt(0).toUpperCase() + (white.classification || "").slice(1)}</span></span>
+              <span class="tags">
+                <span class="tag ${classForTag(white.classification)} ${whiteIsBest ? 'is-best' : ''}">${(white.classification || "").charAt(0).toUpperCase() + (white.classification || "").slice(1)}</span>
+                ${whiteDelta ? `<span class="eval-delta ${whiteDelta.isPositive ? 'positive' : 'negative'}">${whiteDelta.isPositive ? '+' : ''}${whiteDelta.value.toFixed(1)}</span>` : ''}
+              </span>
             ` : `<span class="has-text-grey">--</span>`}
           </div>
-          <div class="move-cell ${black ? "" : "has-background-light"} ${black ? classForTag(black.classification) + " tag-wrapper" : ""}" data-idx="${black ? black.idx : ""}">
+          <div class="move-cell ${black ? "" : "has-background-light"} ${black ? classForCell(black.classification) + (blackIsBest ? " is-best" : "") : ""}" data-idx="${black ? black.idx : ""}">
             ${black ? `
               <span>${black.movePlayed || "--"}</span>
-              <span class="tags"><span class="tag ${classForTag(black.classification)}">${(black.classification || "").charAt(0).toUpperCase() + (black.classification || "").slice(1)}</span></span>
+              <span class="tags">
+                <span class="tag ${classForTag(black.classification)} ${blackIsBest ? 'is-best' : ''}">${(black.classification || "").charAt(0).toUpperCase() + (black.classification || "").slice(1)}</span>
+                ${blackDelta ? `<span class="eval-delta ${blackDelta.isPositive ? 'positive' : 'negative'}">${blackDelta.isPositive ? '+' : ''}${blackDelta.value.toFixed(1)}</span>` : ''}
+              </span>
             ` : `<span class="has-text-grey">--</span>`}
           </div>
         </div>
@@ -346,19 +281,96 @@
     cg.setShapes([{ orig: from, dest: to, brush: "green" }]);
   }
 
+  function applyMoveToFen(fen, moveUci) {
+    if (!moveUci || moveUci.length < 4) return fen;
+    try {
+      const chess = new Chess(fen);
+      const from = moveUci.substring(0, 2);
+      const to = moveUci.substring(2, 4);
+      const promotion = moveUci.length > 4 ? moveUci.substring(4, 5) : null;
+      
+      const move = chess.move({
+        from: from,
+        to: to,
+        promotion: promotion || undefined
+      });
+      
+      if (move) {
+        return chess.fen();
+      }
+    } catch (e) {
+      console.error("Failed to apply move:", e);
+    }
+    return fen;
+  }
+
+  function highlightLastMove(movePlayed) {
+    if (movePlayed && movePlayed.length >= 4) {
+      const from = movePlayed.substring(0, 2);
+      const to = movePlayed.substring(2, 4);
+      cg.set({ lastMove: [from, to] });
+    }
+  }
+
   function goToIndex(idx) {
     if (idx < 0 || idx >= positions.length) return;
     currentIndex = idx;
     const pos = positions[idx];
     const evalPawns = pos.evalAfter / 100;
     const mate = pos.mateAfter;
-    cg.set({ fen: pos.fen, orientation });
+    
+    // Apply the move to get the FEN after the move
+    const fenAfterMove = applyMoveToFen(pos.fen, pos.movePlayed);
+    
+    cg.set({ fen: fenAfterMove, orientation });
     updateEvalBar(evalPawns, mate);
     drawBestMoveArrow(pos.bestMove);
+    highlightLastMove(pos.movePlayed);
     bestMoveNote.textContent = "Best move: " + (pos.bestMove || "--");
     moveStatus.textContent = "Move " + (idx + 1) + "/" + positions.length;
     highlightCurrent();
     updateNavButtons();
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const percent = ((currentIndex + 1) / positions.length) * 100;
+    moveProgress.style.width = percent + "%";
+  }
+
+  function toggleAutoPlay() {
+    if (isPlaying) {
+      stopAutoPlay();
+    } else {
+      startAutoPlay();
+    }
+  }
+
+  function startAutoPlay() {
+    if (currentIndex >= positions.length - 1) {
+      goToIndex(0);
+    }
+    isPlaying = true;
+    playIcon.textContent = "⏸";
+    const speed = parseFloat(playSpeed.value);
+    const delay = (2 / speed) * 1000;
+    
+    autoPlayInterval = setInterval(() => {
+      if (currentIndex < positions.length - 1) {
+        goToIndex(currentIndex + 1);
+      } else {
+        stopAutoPlay();
+      }
+    }, delay);
+  }
+
+  function stopAutoPlay() {
+    isPlaying = false;
+    playIcon.textContent = "▶";
+    if (autoPlayInterval) {
+      clearInterval(autoPlayInterval);
+      autoPlayInterval = null;
+    }
   }
 
   function updateNavButtons() {
@@ -374,12 +386,34 @@
     last.disabled = atEnd;
   }
 
+  function findNextPositionWithDifferentMoveNumber(startIdx, direction) {
+    if (startIdx < 0 || startIdx >= positions.length) return startIdx;
+    const currentMoveNumber = positions[startIdx].moveNumber;
+    let idx = startIdx;
+    while (true) {
+      idx += direction;
+      if (idx < 0 || idx >= positions.length) break;
+      if (positions[idx].moveNumber !== currentMoveNumber) {
+        return idx;
+      }
+    }
+    return startIdx; // Return original if no different move number found
+  }
+
   function setupNav() {
     const actions = {
-      first: () => goToIndex(0),
-      prev: () => goToIndex(currentIndex - 1),
-      next: () => goToIndex(currentIndex + 1),
-      last: () => goToIndex(positions.length - 1),
+      first: () => { stopAutoPlay(); goToIndex(0); },
+      prev: () => { 
+        stopAutoPlay();
+        const nextIdx = findNextPositionWithDifferentMoveNumber(currentIndex, -1);
+        goToIndex(nextIdx); 
+      },
+      next: () => { 
+        stopAutoPlay();
+        const nextIdx = findNextPositionWithDifferentMoveNumber(currentIndex, 1);
+        goToIndex(nextIdx); 
+      },
+      last: () => { stopAutoPlay(); goToIndex(positions.length - 1); },
     };
     document.querySelectorAll("[data-action]").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -387,9 +421,22 @@
         if (actions[act]) actions[act]();
       });
     });
+    
+    autoPlayBtn.addEventListener("click", toggleAutoPlay);
+    playSpeed.addEventListener("change", () => {
+      if (isPlaying) {
+        stopAutoPlay();
+        startAutoPlay();
+      }
+    });
+    
     window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === "ArrowLeft") { e.preventDefault(); actions.prev(); }
       if (e.key === "ArrowRight") { e.preventDefault(); actions.next(); }
+      if (e.key === "Home") { e.preventDefault(); actions.first(); }
+      if (e.key === "End") { e.preventDefault(); actions.last(); }
+      if (e.key === " ") { e.preventDefault(); toggleAutoPlay(); }
     });
   }
 
@@ -414,19 +461,23 @@
     const nameBottom = document.getElementById("name-bottom");
     const iconTop = document.getElementById("icon-top");
     const iconBottom = document.getElementById("icon-bottom");
+    const ratingTop = document.getElementById("rating-top");
+    const ratingBottom = document.getElementById("rating-bottom");
     
     if (orientation === "white") {
-      // White at bottom, black at top
       nameBottom.textContent = whitePlayer;
       nameTop.textContent = blackPlayer;
       iconBottom.classList.add("white");
       iconTop.classList.add("black");
+      ratingBottom.textContent = whiteRating;
+      ratingTop.textContent = blackRating;
     } else {
-      // Black at bottom, white at top
       nameBottom.textContent = blackPlayer;
       nameTop.textContent = whitePlayer;
       iconBottom.classList.add("black");
       iconTop.classList.add("white");
+      ratingBottom.textContent = blackRating;
+      ratingTop.textContent = whiteRating;
     }
   }
 
