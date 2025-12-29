@@ -67,14 +67,14 @@ func (s *Server) handleStopAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("stopping background analysis")
 	s.AnalysisPool.Cancel()
-	
+
 	// Stop backfill if it's running
 	if backfillService, ok := s.GameService.(interface {
 		StopBackfill()
 	}); ok {
 		backfillService.StopBackfill()
 	}
-	
+
 	log.Info("background analysis stopped")
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -245,8 +245,17 @@ func (s *Server) handleGameDetail(w http.ResponseWriter, r *http.Request) {
 		log.Debug("found %d positions for game", len(positions))
 	}
 
+	flashcardCount, err := s.FlashcardService.CountFlashcardsByGame(r.Context(), id, profile.ID)
+	if err != nil {
+		log.Warn("failed to get flashcard count for game: %v", err)
+		flashcardCount = 0
+	} else {
+		log.Debug("found %d flashcards for game", flashcardCount)
+	}
+
 	s.render(w, r, "pages/game_detail.html", pageData{
-		"game":      game,
-		"positions": positions,
+		"game":            game,
+		"positions":       positions,
+		"flashcard_count": flashcardCount,
 	})
 }

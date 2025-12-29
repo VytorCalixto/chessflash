@@ -93,6 +93,15 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
 
+  .flashcard-list-item {
+    border-bottom: 1px solid #e5e5e5;
+    padding: 1rem 0;
+  }
+
+  .flashcard-list-item:last-child {
+    border-bottom: none;
+  }
+
   @keyframes fadeInUp {
     from {
       opacity: 0;
@@ -128,6 +137,171 @@
 </style>
 
 <h1 class="title is-4">Flashcards</h1>
+{{if .filtered_by_game}}
+<!-- Single-card interactive view for flashcards from a specific game -->
+{{if .game}}
+<div class="mb-4">
+  <div class="level is-mobile">
+    <div class="level-left">
+      <div class="level-item">
+        <a href="/games/{{.game.ID}}" class="button is-small is-light">
+          ← Back to Game
+        </a>
+      </div>
+      <div class="level-item">
+        <p class="is-size-7 has-text-grey">
+          <strong>Game:</strong> {{.game.Opponent}} ({{.game.TimeClass}}) • {{.game.PlayedAt.Format "Jan 2, 2006"}} • {{.game.Result}}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{if .completed}}
+<!-- Completion message when all flashcards from game are done -->
+<div class="box has-background-success-light">
+  <div class="content has-text-centered">
+    <h2 class="title is-4 mb-4">🎉 All Flashcards Completed!</h2>
+    <p class="mb-4">
+      You've reviewed all <strong>{{.total_count}}</strong> flashcards from this game.
+    </p>
+    <div class="buttons is-centered">
+      <a href="/flashcards" class="button is-primary is-medium">
+        Continue with Random Flashcards
+      </a>
+      <a href="/games/{{.game.ID}}" class="button is-light is-medium">
+        Back to Game
+      </a>
+    </div>
+  </div>
+</div>
+{{else if .card}}
+<!-- Navigation controls -->
+<div class="box mb-4">
+  <div class="level is-mobile">
+    <div class="level-left">
+      <div class="level-item">
+        <p class="is-size-6">
+          <strong>Flashcard {{.current_index}} of {{.total_count}}</strong> from this game
+        </p>
+      </div>
+    </div>
+    <div class="level-right">
+      <div class="level-item">
+        <div class="buttons">
+          {{if gt .current_index 1}}
+          <a href="/flashcards?game_id={{.game.ID}}&card_index={{sub .current_index 1}}" class="button is-small">
+            ← Previous
+          </a>
+          {{else}}
+          <button class="button is-small" disabled>← Previous</button>
+          {{end}}
+          {{if lt .current_index .total_count}}
+          <a href="/flashcards?game_id={{.game.ID}}&card_index={{add .current_index 1}}" class="button is-small">
+            Next →
+          </a>
+          {{else}}
+          <button class="button is-small" disabled>Next →</button>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Metadata Card -->
+<div class="card mb-4">
+  <div class="card-content">
+    <div class="columns is-mobile is-multiline mb-0">
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Move</p>
+        <p class="is-size-6 has-text-weight-semibold">#{{.card.MoveNumber}}</p>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Classification</p>
+        <span class="tag is-{{if eq .card.Classification "blunder"}}danger{{else if eq .card.Classification "mistake"}}warning{{else}}info{{end}}">
+          {{.card.Classification}}
+        </span>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Your Move</p>
+        <p class="is-size-6 has-text-weight-semibold" style="font-family: monospace;">{{.card.MovePlayed}}</p>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Date</p>
+        <p class="is-size-6">{{.card.PlayedAt.Format "Jan 2, 2006"}}</p>
+      </div>
+    </div>
+    <div class="is-size-7 has-text-grey mt-2">
+      {{.card.WhitePlayer}} ({{.card.PlayerRating}}) vs {{.card.BlackPlayer}} ({{.card.OpponentRating}}) • {{.card.TimeClass}}
+    </div>
+  </div>
+</div>
+
+<div class="flashcard-layout">
+  <div>
+    <div class="board-container">
+      <div class="attempt-indicator is-hidden" id="attempt-indicator">
+        <span id="attempt-count-display">0/3</span>
+      </div>
+      <div class="player-info" id="player-top">
+        <span class="piece-icon" id="icon-top"></span>
+        <span class="player-name" id="name-top"></span>
+      </div>
+      <div class="board-area">
+        <div class="eval-bar">
+          <div class="eval-label white-advantage" id="eval-label" data-initial-eval="{{printf "%.2f" .card.EvalBefore}}">+0.0</div>
+          <div class="eval-track">
+            <div class="eval-fill" id="eval-fill"></div>
+          </div>
+        </div>
+        <div class="board-wrapper">
+          <div id="board"></div>
+        </div>
+      </div>
+      <div class="player-info" id="player-bottom">
+        <span class="piece-icon" id="icon-bottom"></span>
+        <span class="player-name" id="name-bottom"></span>
+      </div>
+    </div>
+    <div class="mt-3">
+      <button id="show-answer" class="button is-light is-small">Show answer</button>
+    </div>
+  </div>
+  
+  <div class="feedback-section">
+    <div class="feedback-box" id="feedback-box">
+      <div class="level is-mobile mb-2">
+        <div class="level-left">
+          <p id="prompt-text" class="has-text-weight-semibold is-size-5">Find the best move in this position</p>
+        </div>
+      </div>
+      <div id="feedback-content">
+        <p id="feedback-text" class="mt-2"></p>
+        <p id="loss-text" class="mt-2 has-text-danger"></p>
+        <p id="meta-text" class="mt-2 is-size-7 has-text-grey"></p>
+      </div>
+    </div>
+
+    <form id="review-form" class="mt-4 is-hidden" method="post" action="/flashcards/{{.card.ID}}/review">
+      <input type="hidden" name="game_id" value="{{.game.ID}}">
+      <input type="hidden" name="card_index" value="{{.current_index}}">
+      <div class="box has-background-light">
+        <div class="rating-badge" id="rating-badge">
+          <span id="auto-rating-message">Processing...</span>
+        </div>
+        <div class="mt-4" id="next-card-container"></div>
+      </div>
+    </form>
+  </div>
+</div>
+{{else}}
+<p>No flashcards found for this game.</p>
+{{end}}
+
+{{else}}
+<!-- Single card review mode (existing behavior) -->
 {{if .card}}
 <!-- Game Metadata Card -->
 <div class="card mb-4">
@@ -215,6 +389,7 @@
 </div>
 {{else}}
 <p>No cards due. Come back later!</p>
+{{end}}
 {{end}}
 
 {{if .card}}

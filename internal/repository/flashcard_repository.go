@@ -13,4 +13,6 @@ type FlashcardRepository interface {
 	NextFlashcards(ctx context.Context, profileID int64, limit int) ([]models.Flashcard, error)
 	FlashcardWithPosition(ctx context.Context, id int64, profileID int64) (*models.FlashcardWithPosition, error)
 	InsertReviewHistory(ctx context.Context, flashcardID int64, quality int, timeSeconds float64) error
+	CountByGameID(ctx context.Context, gameID int64, profileID int64) (int, error)
+	ListByGameID(ctx context.Context, gameID int64, profileID int64, limit int, offset int) ([]models.FlashcardWithPosition, error)
 }

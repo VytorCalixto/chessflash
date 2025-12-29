@@ -15,6 +15,8 @@ import (
 type FlashcardService interface {
 	GetNextFlashcard(ctx context.Context, profileID int64) (*models.FlashcardWithPosition, error)
 	ReviewFlashcard(ctx context.Context, flashcardID int64, profileID int64, quality int, timeSeconds float64) error
+	CountFlashcardsByGame(ctx context.Context, gameID int64, profileID int64) (int, error)
+	ListFlashcardsByGame(ctx context.Context, gameID int64, profileID int64, limit int, offset int) ([]models.FlashcardWithPosition, int, error)
 }
 
 type flashcardService struct {
@@ -97,4 +99,36 @@ func (s *flashcardService) ReviewFlashcard(ctx context.Context, flashcardID int6
 	}
 
 	return nil
+}
+
+func (s *flashcardService) CountFlashcardsByGame(ctx context.Context, gameID int64, profileID int64) (int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("counting flashcards by game: game_id=%d, profile_id=%d", gameID, profileID)
+
+	count, err := s.flashcardRepo.CountByGameID(ctx, gameID, profileID)
+	if err != nil {
+		log.Error("failed to count flashcards by game: %v", err)
+		return 0, errors.NewInternalError(err)
+	}
+
+	return count, nil
+}
+
+func (s *flashcardService) ListFlashcardsByGame(ctx context.Context, gameID int64, profileID int64, limit int, offset int) ([]models.FlashcardWithPosition, int, error) {
+	log := logger.FromContext(ctx)
+	log.Debug("listing flashcards by game: game_id=%d, profile_id=%d, limit=%d, offset=%d", gameID, profileID, limit, offset)
+
+	cards, err := s.flashcardRepo.ListByGameID(ctx, gameID, profileID, limit, offset)
+	if err != nil {
+		log.Error("failed to list flashcards by game: %v", err)
+		return nil, 0, errors.NewInternalError(err)
+	}
+
+	totalCount, err := s.flashcardRepo.CountByGameID(ctx, gameID, profileID)
+	if err != nil {
+		log.Error("failed to count flashcards for pagination: %v", err)
+		return nil, 0, errors.NewInternalError(err)
+	}
+
+	return cards, totalCount, nil
 }

@@ -74,9 +74,53 @@ export function showReviewForm(reviewForm, cardStartTime, wasCorrect, attemptCou
     ratingBadge.className = `rating-badge ${qualityLabels[quality].toLowerCase()}`;
   }
   
-  // Clear any existing inputs and buttons (in case form is shown multiple times)
+  // Clear existing inputs and buttons (in case form is shown multiple times)
+  // But preserve game_id and card_index if they exist (for game-filtered flashcards)
   const existingInputs = reviewForm.querySelectorAll('input[type="hidden"]');
-  existingInputs.forEach(input => input.remove());
+  let gameIdValue = null;
+  let cardIndexValue = null;
+  
+  // Preserve game_id and card_index values, remove only other inputs
+  existingInputs.forEach(input => {
+    if (input.name === 'game_id') {
+      gameIdValue = input.value;
+      // Keep this input, don't remove it
+    } else if (input.name === 'card_index') {
+      cardIndexValue = input.value;
+      // Keep this input, don't remove it
+    } else {
+      // Remove only non-game inputs (time_seconds, attempt_count, quality, etc.)
+      input.remove();
+    }
+  });
+  
+  // If game_id/card_index weren't in form, try to get them from URL
+  if (!gameIdValue || !cardIndexValue) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!gameIdValue) {
+      gameIdValue = urlParams.get('game_id');
+      if (gameIdValue) {
+        // Add game_id input if we got it from URL
+        const gameIdInput = document.createElement('input');
+        gameIdInput.type = 'hidden';
+        gameIdInput.name = 'game_id';
+        gameIdInput.value = gameIdValue;
+        reviewForm.appendChild(gameIdInput);
+      }
+    }
+    if (!cardIndexValue) {
+      cardIndexValue = urlParams.get('card_index');
+      if (cardIndexValue) {
+        // Add card_index input if we got it from URL
+        const cardIndexInput = document.createElement('input');
+        cardIndexInput.type = 'hidden';
+        cardIndexInput.name = 'card_index';
+        cardIndexInput.value = cardIndexValue;
+        reviewForm.appendChild(cardIndexInput);
+      }
+    }
+  }
+  
   const nextCardContainer = document.getElementById('next-card-container');
   if (nextCardContainer) {
     nextCardContainer.innerHTML = '';

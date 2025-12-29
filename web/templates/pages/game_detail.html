@@ -83,6 +83,13 @@
         <strong>Date:</strong>
         <span>{{.game.PlayedAt.Format "2006-01-02"}} | <strong>Format:</strong> {{.game.TimeClass}}</span>
       </div>
+      <div class="info-item">
+        <strong>Flashcards:</strong>
+        <span>{{.flashcard_count}}</span>
+        {{if gt .flashcard_count 0}}
+        <a href="/flashcards?game_id={{.game.ID}}" class="button is-small is-link ml-2">View Flashcards</a>
+        {{end}}
+      </div>
     </div>
     <div class="move-list-header">
       <h2 class="title is-5 mb-0">Moves</h2>

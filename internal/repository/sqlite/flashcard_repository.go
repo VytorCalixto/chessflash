@@ -148,3 +148,77 @@ func (r *flashcardRepository) InsertReviewHistory(ctx context.Context, flashcard
 	}
 	return err
 }
+
+func (r *flashcardRepository) CountByGameID(ctx context.Context, gameID int64, profileID int64) (int, error) {
+	log := logger.FromContext(ctx).WithPrefix("flashcard_repo")
+	log.Debug("counting flashcards by game: game_id=%d, profile_id=%d", gameID, profileID)
+
+	var count int
+	err := r.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM flashcards f
+JOIN positions p ON p.id = f.position_id
+JOIN games g ON g.id = p.game_id
+WHERE p.game_id = ? AND g.profile_id = ?
+`, gameID, profileID).Scan(&count)
+	if err != nil {
+		log.Error("failed to count flashcards by game: %v", err)
+		return 0, err
+	}
+	log.Debug("found %d flashcards for game", count)
+	return count, nil
+}
+
+func (r *flashcardRepository) ListByGameID(ctx context.Context, gameID int64, profileID int64, limit int, offset int) ([]models.FlashcardWithPosition, error) {
+	log := logger.FromContext(ctx).WithPrefix("flashcard_repo")
+	log.Debug("listing flashcards by game: game_id=%d, profile_id=%d, limit=%d, offset=%d", gameID, profileID, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, `
+SELECT 
+    f.id, f.position_id, f.due_at, f.interval_days, f.ease_factor, f.times_reviewed, f.times_correct, f.created_at,
+    p.game_id, p.move_number, p.fen, p.move_played, p.best_move, p.eval_before, p.eval_after, p.eval_diff, p.mate_before, p.mate_after, p.classification,
+    CASE WHEN g.played_as = 'white' THEN pr.username ELSE g.opponent END AS white_player,
+    CASE WHEN g.played_as = 'black' THEN pr.username ELSE g.opponent END AS black_player,
+    prev_p.move_played AS prev_move_played,
+    g.player_rating, g.opponent_rating, g.played_at, g.time_class
+FROM flashcards f
+JOIN positions p ON p.id = f.position_id
+JOIN games g ON g.id = p.game_id
+JOIN profiles pr ON pr.id = g.profile_id
+LEFT JOIN positions prev_p ON prev_p.game_id = p.game_id AND prev_p.move_number = p.move_number - 1
+WHERE p.game_id = ? AND g.profile_id = ?
+ORDER BY p.move_number ASC
+LIMIT ? OFFSET ?
+`, gameID, profileID, limit, offset)
+	if err != nil {
+		log.Error("failed to query flashcards by game: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []models.FlashcardWithPosition
+	for rows.Next() {
+		var fp models.FlashcardWithPosition
+		var prevMovePlayed sql.NullString
+		var playerRating, opponentRating sql.NullInt64
+		if err := rows.Scan(&fp.ID, &fp.PositionID, &fp.DueAt, &fp.IntervalDays, &fp.EaseFactor, &fp.TimesReviewed, &fp.TimesCorrect, &fp.CreatedAt,
+			&fp.GameID, &fp.MoveNumber, &fp.FEN, &fp.MovePlayed, &fp.BestMove, &fp.EvalBefore, &fp.EvalAfter, &fp.EvalDiff, &fp.MateBefore, &fp.MateAfter, &fp.Classification,
+			&fp.WhitePlayer, &fp.BlackPlayer, &prevMovePlayed,
+			&playerRating, &opponentRating, &fp.PlayedAt, &fp.TimeClass); err != nil {
+			log.Error("failed to scan flashcard row: %v", err)
+			return nil, err
+		}
+		if prevMovePlayed.Valid {
+			fp.PrevMovePlayed = prevMovePlayed.String
+		}
+		if playerRating.Valid {
+			fp.PlayerRating = int(playerRating.Int64)
+		}
+		if opponentRating.Valid {
+			fp.OpponentRating = int(opponentRating.Int64)
+		}
+		cards = append(cards, fp)
+	}
+	log.Debug("found %d flashcards for game", len(cards))
+	return cards, rows.Err()
+}
