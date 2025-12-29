@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/url"
 	"path/filepath"
@@ -47,6 +48,14 @@ func LoadTemplates() (*template.Template, error) {
 		// urlquery URL-encodes a string
 		"urlquery": func(s string) string {
 			return url.QueryEscape(s)
+		},
+		// json marshals a value to JSON string
+		"json": func(v interface{}) (string, error) {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return "", err
+			}
+			return string(b), nil
 		},
 	}
 

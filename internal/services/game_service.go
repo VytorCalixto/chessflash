@@ -6,9 +6,10 @@ import (
 
 	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/errors"
+	"github.com/vytor/chessflash/internal/jobs"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
-	"github.com/vytor/chessflash/internal/worker"
+	"github.com/vytor/chessflash/internal/repository"
 )
 
 // GameService handles game-related business logic
@@ -16,25 +17,33 @@ type GameService interface {
 	GetGame(ctx context.Context, id int64, profileID int64) (*models.Game, error)
 	ListGames(ctx context.Context, filter models.GameFilter) ([]models.Game, int, error)
 	GetPositionsForGame(ctx context.Context, gameID int64) ([]models.Position, error)
-	QueueGameAnalysis(ctx context.Context, gameID int64, profileID int64, analysisPool *worker.Pool, stockfishPath string, stockfishDepth int) error
-	ResumeAnalysis(ctx context.Context, profileID int64, analysisPool *worker.Pool, stockfishPath string, stockfishDepth int) (int, error)
+	QueueGameAnalysis(ctx context.Context, gameID int64, profileID int64) error
+	ResumeAnalysis(ctx context.Context, profileID int64) (int, error)
 	CountGamesNeedingAnalysis(ctx context.Context, profileID int64) (int, error)
 }
 
 type gameService struct {
-	db *db.DB
+	gameRepo     repository.GameRepository
+	positionRepo repository.PositionRepository
+	jobQueue     jobs.JobQueue
+	db           *db.DB // Temporary: will be removed in Phase 4 when jobs use repositories
 }
 
 // NewGameService creates a new GameService
-func NewGameService(db *db.DB) GameService {
-	return &gameService{db: db}
+func NewGameService(gameRepo repository.GameRepository, positionRepo repository.PositionRepository, jobQueue jobs.JobQueue, database *db.DB) GameService {
+	return &gameService{
+		gameRepo:     gameRepo,
+		positionRepo: positionRepo,
+		jobQueue:     jobQueue,
+		db:           database,
+	}
 }
 
 func (s *gameService) GetGame(ctx context.Context, id int64, profileID int64) (*models.Game, error) {
 	log := logger.FromContext(ctx)
 	log.Debug("getting game: id=%d, profile_id=%d", id, profileID)
 
-	game, err := s.db.GetGame(ctx, id)
+	game, err := s.gameRepo.Get(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.NewNotFoundError("game", id)
@@ -59,13 +68,13 @@ func (s *gameService) ListGames(ctx context.Context, filter models.GameFilter) (
 	log := logger.FromContext(ctx)
 	log.Debug("listing games with filter: profile_id=%d", filter.ProfileID)
 
-	games, err := s.db.ListGames(ctx, filter)
+	games, err := s.gameRepo.List(ctx, filter)
 	if err != nil {
 		log.Error("failed to list games: %v", err)
 		return nil, 0, errors.NewInternalError(err)
 	}
 
-	totalCount, err := s.db.CountGames(ctx, filter)
+	totalCount, err := s.gameRepo.Count(ctx, filter)
 	if err != nil {
 		log.Error("failed to count games: %v", err)
 		return nil, 0, errors.NewInternalError(err)
@@ -78,7 +87,7 @@ func (s *gameService) GetPositionsForGame(ctx context.Context, gameID int64) ([]
 	log := logger.FromContext(ctx)
 	log.Debug("getting positions for game: game_id=%d", gameID)
 
-	positions, err := s.db.PositionsForGame(ctx, gameID)
+	positions, err := s.positionRepo.PositionsForGame(ctx, gameID)
 	if err != nil {
 		log.Error("failed to get positions: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -87,11 +96,11 @@ func (s *gameService) GetPositionsForGame(ctx context.Context, gameID int64) ([]
 	return positions, nil
 }
 
-func (s *gameService) QueueGameAnalysis(ctx context.Context, gameID int64, profileID int64, analysisPool *worker.Pool, stockfishPath string, stockfishDepth int) error {
+func (s *gameService) QueueGameAnalysis(ctx context.Context, gameID int64, profileID int64) error {
 	log := logger.FromContext(ctx)
 	log.Debug("queueing game analysis: game_id=%d", gameID)
 
-	game, err := s.db.GetGame(ctx, gameID)
+	game, err := s.gameRepo.Get(ctx, gameID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return errors.NewNotFoundError("game", gameID)
@@ -115,38 +124,28 @@ func (s *gameService) QueueGameAnalysis(ctx context.Context, gameID int64, profi
 		return nil
 	}
 
-	analysisPool.Submit(&worker.AnalyzeGameJob{
-		DB:             s.db,
-		GameID:         gameID,
-		StockfishPath:  stockfishPath,
-		StockfishDepth: stockfishDepth,
-	})
-
-	return nil
+	return s.jobQueue.EnqueueAnalysis(gameID)
 }
 
-func (s *gameService) ResumeAnalysis(ctx context.Context, profileID int64, analysisPool *worker.Pool, stockfishPath string, stockfishDepth int) (int, error) {
+func (s *gameService) ResumeAnalysis(ctx context.Context, profileID int64) (int, error) {
 	log := logger.FromContext(ctx)
 	log.Debug("resuming analysis for profile: profile_id=%d", profileID)
 
 	// Reset any stuck processing games
-	if err := s.db.ResetProcessingToPending(ctx, profileID); err != nil {
+	if err := s.gameRepo.ResetProcessingToPending(ctx, profileID); err != nil {
 		log.Warn("failed to reset processing games: %v", err)
 	}
 
-	games, err := s.db.GamesNeedingAnalysis(ctx, profileID)
+	games, err := s.gameRepo.GamesNeedingAnalysis(ctx, profileID)
 	if err != nil {
 		log.Error("failed to list games needing analysis: %v", err)
 		return 0, errors.NewInternalError(err)
 	}
 
 	for _, g := range games {
-		analysisPool.Submit(&worker.AnalyzeGameJob{
-			DB:             s.db,
-			GameID:         g.ID,
-			StockfishPath:  stockfishPath,
-			StockfishDepth: stockfishDepth,
-		})
+		if err := s.jobQueue.EnqueueAnalysis(g.ID); err != nil {
+			log.Warn("failed to enqueue analysis for game %d: %v", g.ID, err)
+		}
 	}
 
 	return len(games), nil
@@ -156,7 +155,7 @@ func (s *gameService) CountGamesNeedingAnalysis(ctx context.Context, profileID i
 	log := logger.FromContext(ctx)
 	log.Debug("counting games needing analysis: profile_id=%d", profileID)
 
-	count, err := s.db.CountGamesNeedingAnalysis(ctx, profileID)
+	count, err := s.gameRepo.CountGamesNeedingAnalysis(ctx, profileID)
 	if err != nil {
 		log.Error("failed to count games needing analysis: %v", err)
 		return 0, errors.NewInternalError(err)

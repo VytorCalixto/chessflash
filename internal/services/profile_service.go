@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
+	"github.com/vytor/chessflash/internal/repository"
 )
 
 // ProfileService handles profile-related business logic
@@ -19,19 +19,19 @@ type ProfileService interface {
 }
 
 type profileService struct {
-	db *db.DB
+	profileRepo repository.ProfileRepository
 }
 
 // NewProfileService creates a new ProfileService
-func NewProfileService(db *db.DB) ProfileService {
-	return &profileService{db: db}
+func NewProfileService(profileRepo repository.ProfileRepository) ProfileService {
+	return &profileService{profileRepo: profileRepo}
 }
 
 func (s *profileService) ListProfiles(ctx context.Context) ([]models.Profile, error) {
 	log := logger.FromContext(ctx)
 	log.Debug("listing profiles")
 
-	profiles, err := s.db.ListProfiles(ctx)
+	profiles, err := s.profileRepo.List(ctx)
 	if err != nil {
 		log.Error("failed to list profiles: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -48,7 +48,7 @@ func (s *profileService) CreateProfile(ctx context.Context, username string) (*m
 		return nil, errors.NewValidationError("username", "cannot be empty")
 	}
 
-	profile, err := s.db.UpsertProfile(ctx, username)
+	profile, err := s.profileRepo.Upsert(ctx, username)
 	if err != nil {
 		log.Error("failed to create profile: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -61,7 +61,7 @@ func (s *profileService) GetProfile(ctx context.Context, id int64) (*models.Prof
 	log := logger.FromContext(ctx)
 	log.Debug("getting profile: id=%d", id)
 
-	profile, err := s.db.GetProfile(ctx, id)
+	profile, err := s.profileRepo.Get(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.NewNotFoundError("profile", id)
@@ -81,7 +81,7 @@ func (s *profileService) DeleteProfile(ctx context.Context, id int64) error {
 	log := logger.FromContext(ctx)
 	log.Debug("deleting profile: id=%d", id)
 
-	if err := s.db.DeleteProfile(ctx, id); err != nil {
+	if err := s.profileRepo.Delete(ctx, id); err != nil {
 		log.Error("failed to delete profile: %v", err)
 		return errors.NewInternalError(err)
 	}

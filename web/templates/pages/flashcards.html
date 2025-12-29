@@ -68,8 +68,65 @@
   .feedback-box {
     background: #f9f9f9;
     border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    transition: all 0.3s ease;
+  }
+  .feedback-box.success {
+    background: #f0f9f4;
+    border-color: #48c774;
+  }
+  .feedback-box.error {
+    background: #fff5f5;
+    border-color: #f14668;
+  }
+  .feedback-box.info {
+    background: #f0f7ff;
+    border-color: #3273dc;
+  }
+  .rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f5f5f5;
     border-radius: 6px;
-    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+  }
+  .rating-badge.again {
+    background: #fee;
+    color: #c33;
+  }
+  .rating-badge.hard {
+    background: #fff4e6;
+    color: #d97706;
+  }
+  .rating-badge.good {
+    background: #f0fdf4;
+    color: #16a34a;
+  }
+  .rating-badge.easy {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+  .board-container {
+    position: relative;
+    background: #fafafa;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .attempt-indicator {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    z-index: 10;
   }
   .best-move {
     font-family: monospace;
@@ -100,441 +157,177 @@
     background: #262421;
     border: 1px solid #262421;
   }
+  .flashcard-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .feedback-box, .rating-badge, .button {
+    transition: all 0.2s ease;
+  }
+  .button.is-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
   @media (max-width: 960px) {
     .flashcard-layout {
       flex-direction: column;
+      gap: 1rem;
     }
     .board-wrapper {
       width: 100%;
-      max-width: 480px;
+      max-width: 100%;
     }
     .board-wrapper {
       width: 100%;
-      max-width: 480px;
+      max-width: 100%;
       height: auto;
       aspect-ratio: 1;
     }
     .eval-track {
       height: 100%;
     }
+    .feedback-box {
+      padding: 1rem;
+    }
+  }
+  @media (max-width: 768px) {
+    .flashcard-layout {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .board-wrapper {
+      width: 100%;
+      max-width: 100%;
+    }
+    .feedback-box {
+      padding: 1rem;
+    }
   }
 </style>
 
 <h1 class="title is-4">Flashcards</h1>
 {{if .card}}
+<!-- Game Metadata Card -->
+<div class="card mb-4">
+  <div class="card-content">
+    <div class="columns is-mobile is-multiline mb-0">
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Move</p>
+        <p class="is-size-6 has-text-weight-semibold">#{{.card.MoveNumber}}</p>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Classification</p>
+        <span class="tag is-{{if eq .card.Classification "blunder"}}danger{{else if eq .card.Classification "mistake"}}warning{{else}}info{{end}}">
+          {{.card.Classification}}
+        </span>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Your Move</p>
+        <p class="is-size-6 has-text-weight-semibold" style="font-family: monospace;">{{.card.MovePlayed}}</p>
+      </div>
+      <div class="column is-half-mobile">
+        <p class="heading is-size-7 mb-1">Date</p>
+        <p class="is-size-6">{{.card.PlayedAt.Format "Jan 2, 2006"}}</p>
+      </div>
+    </div>
+    <div class="is-size-7 has-text-grey mt-2">
+      {{.card.WhitePlayer}} ({{.card.PlayerRating}}) vs {{.card.BlackPlayer}} ({{.card.OpponentRating}}) • {{.card.TimeClass}}
+    </div>
+  </div>
+</div>
+
 <div class="flashcard-layout">
   <div>
-    <div class="mb-2 has-text-grey is-size-7">
-      Move #{{.card.MoveNumber}} &nbsp;|&nbsp; Classification: {{.card.Classification}} &nbsp;|&nbsp; Played: {{.card.MovePlayed}} &nbsp;|&nbsp; White: {{.card.WhitePlayer}} vs Black: {{.card.BlackPlayer}}<br>
-      Player Rating: {{.card.PlayerRating}} | Opponent Rating: {{.card.OpponentRating}} | Date: {{.card.PlayedAt.Format "2006-01-02"}} | Time Format: {{.card.TimeClass}}
-    </div>
-    <div class="player-info" id="player-top">
-      <span class="piece-icon" id="icon-top"></span>
-      <span class="player-name" id="name-top"></span>
-    </div>
-    <div class="board-area">
-      <div class="eval-bar">
-        <div class="eval-label white-advantage" id="eval-label" data-initial-eval="{{printf "%.2f" .card.EvalBefore}}">+0.0</div>
-        <div class="eval-track">
-          <div class="eval-fill" id="eval-fill"></div>
+    <div class="board-container">
+      <div class="attempt-indicator is-hidden" id="attempt-indicator">
+        <span id="attempt-count-display">0/3</span>
+      </div>
+      <div class="player-info" id="player-top">
+        <span class="piece-icon" id="icon-top"></span>
+        <span class="player-name" id="name-top"></span>
+      </div>
+      <div class="board-area">
+        <div class="eval-bar">
+          <div class="eval-label white-advantage" id="eval-label" data-initial-eval="{{printf "%.2f" .card.EvalBefore}}">+0.0</div>
+          <div class="eval-track">
+            <div class="eval-fill" id="eval-fill"></div>
+          </div>
+        </div>
+        <div class="board-wrapper">
+          <div id="board"></div>
         </div>
       </div>
-      <div class="board-wrapper">
-        <div id="board"></div>
+      <div class="player-info" id="player-bottom">
+        <span class="piece-icon" id="icon-bottom"></span>
+        <span class="player-name" id="name-bottom"></span>
       </div>
-    </div>
-    <div class="player-info" id="player-bottom">
-      <span class="piece-icon" id="icon-bottom"></span>
-      <span class="player-name" id="name-bottom"></span>
     </div>
     <div class="mt-3">
       <button id="show-answer" class="button is-light is-small">Show answer</button>
     </div>
   </div>
-</div>
+  
+  <div class="feedback-section">
+    <div class="feedback-box" id="feedback-box">
+      <div class="level is-mobile mb-2">
+        <div class="level-left">
+          <p id="prompt-text" class="has-text-weight-semibold is-size-5">Find the best move in this position</p>
+        </div>
+      </div>
+      <div id="feedback-content">
+        <p id="feedback-text" class="mt-2"></p>
+        <p id="loss-text" class="mt-2 has-text-danger"></p>
+        <p id="meta-text" class="mt-2 is-size-7 has-text-grey"></p>
+      </div>
+    </div>
 
-<div class="feedback-box mt-4">
-  <p id="prompt-text" class="has-text-weight-semibold">Find the best move in this position</p>
-  <p id="feedback-text" class="mt-1"></p>
-  <p id="loss-text" class="mt-1 has-text-danger"></p>
-  <p id="meta-text" class="mt-1 is-size-7 has-text-grey"></p>
-</div>
-
-<form id="review-form" class="mt-4 is-hidden" method="post" action="/flashcards/{{.card.ID}}/review">
-  <div class="buttons">
-    <button class="button is-danger" name="quality" value="0">Again</button>
-    <button class="button is-warning" name="quality" value="1">Hard</button>
-    <button class="button is-success" name="quality" value="2">Good</button>
-    <button class="button is-primary" name="quality" value="3">Easy</button>
+    <form id="review-form" class="mt-4 is-hidden" method="post" action="/flashcards/{{.card.ID}}/review">
+      <div class="box has-background-light">
+        <div class="rating-badge" id="rating-badge">
+          <span id="auto-rating-message">Processing...</span>
+        </div>
+        <div class="mt-4" id="next-card-container"></div>
+      </div>
+    </form>
   </div>
-</form>
+</div>
 {{else}}
 <p>No cards due. Come back later!</p>
 {{end}}
 
 {{if .card}}
+<script id="flashcard-data" type="application/json">
+{
+  "fen": {{.card.FEN | json}},
+  "bestMove": {{.card.BestMove | json}},
+  "mateBefore": {{if .card.MateBefore}}{{.card.MateBefore}}{{else}}null{{end}},
+  "mateAfter": {{if .card.MateAfter}}{{.card.MateAfter}}{{else}}null{{end}},
+  "evalBefore": {{printf "%.2f" .card.EvalBefore}},
+  "evalAfter": {{printf "%.2f" .card.EvalAfter}},
+  "evalDiff": {{printf "%.2f" .card.EvalDiff}},
+  "classification": {{.card.Classification | json}},
+  "movePlayed": {{.card.MovePlayed | json}},
+  "prevMovePlayed": {{.card.PrevMovePlayed | json}},
+  "whitePlayer": {{.card.WhitePlayer | json}},
+  "blackPlayer": {{.card.BlackPlayer | json}}
+}
+</script>
+<script type="module" src="/static/js/flashcard/main.js"></script>
+{{else}}
 <script>
-  (function() {
-    // Wait for all scripts to load
-    function initBoard() {
-    const fen = "{{.card.FEN}}";
-    const bestMove = "{{.card.BestMove}}".trim();
-    // Mate fields (positive = white mates in N, negative = black mates in N)
-    const mateBefore = {{if .card.MateBefore}}{{.card.MateBefore}}{{else}}null{{end}};
-    const mateAfter = {{if .card.MateAfter}}{{.card.MateAfter}}{{else}}null{{end}};
-
-    // Convert centipawns to pawns (divide by 100) and ensure they're numbers
-    const evalBefore = parseFloat({{printf "%.2f" .card.EvalBefore}}) / 100;
-    const evalAfter = parseFloat({{printf "%.2f" .card.EvalAfter}}) / 100;
-    const evalDiff = parseFloat({{printf "%.2f" .card.EvalDiff}}) / 100;
-    const classification = "{{.card.Classification}}".toLowerCase();
-    const movePlayed = "{{.card.MovePlayed}}";
-    const prevMovePlayed = "{{.card.PrevMovePlayed}}";
-    const whitePlayer = "{{.card.WhitePlayer}}";
-    const blackPlayer = "{{.card.BlackPlayer}}";
-    console.log("Player names:", { whitePlayer, blackPlayer });
-
-    // Parse the last move for highlighting (opponent's move that led to this position)
-    let lastMove = null;
-    if (prevMovePlayed && prevMovePlayed.length >= 4) {
-      const from = prevMovePlayed.substring(0, 2);
-      const to = prevMovePlayed.substring(2, 4);
-      lastMove = [from, to];
-    }
-
-    const promptEl = document.getElementById("prompt-text");
-    const feedbackEl = document.getElementById("feedback-text");
-    const lossEl = document.getElementById("loss-text");
-    const metaEl = document.getElementById("meta-text");
-    const reviewForm = document.getElementById("review-form");
-    const showAnswerBtn = document.getElementById("show-answer");
-    const evalFill = document.getElementById("eval-fill");
-    const evalLabel = document.getElementById("eval-label");
-
-    const chess = new Chess(fen);
-    const sideToMove = fen.split(" ")[1] === "w" ? "white" : "black";
-    let attempted = false;
-    let cardStartTime = Date.now(); // Track when card is displayed
-
-    function getLegalMoves(chess) {
-      const dests = new Map();
-      const squares = ['a1','a2','a3','a4','a5','a6','a7','a8',
-                       'b1','b2','b3','b4','b5','b6','b7','b8',
-                       'c1','c2','c3','c4','c5','c6','c7','c8',
-                       'd1','d2','d3','d4','d5','d6','d7','d8',
-                       'e1','e2','e3','e4','e5','e6','e7','e8',
-                       'f1','f2','f3','f4','f5','f6','f7','f8',
-                       'g1','g2','g3','g4','g5','g6','g7','g8',
-                       'h1','h2','h3','h4','h5','h6','h7','h8'];
-      squares.forEach(s => {
-        const moves = chess.moves({ square: s, verbose: true });
-        if (moves.length) {
-          dests.set(s, moves.map(m => m.to));
-        }
-      });
-      return dests;
-    }
-
-    function moveToUci(moveObj) {
-      if (!moveObj) return "";
-      const promo = moveObj.promotion ? moveObj.promotion : "";
-      return `${moveObj.from}${moveObj.to}${promo}`;
-    }
-
-    function showEvalLoading() {
-      evalLabel.textContent = "...";
-      evalLabel.style.opacity = "0.6";
-    }
-
-    function hideEvalLoading() {
-      evalLabel.style.opacity = "1";
-    }
-
-    async function handleMove(orig, dest) {
-      if (attempted) return;
-
-      const move = chess.move({ from: orig, to: dest, promotion: 'q' });
-      if (!move) {
-        // Revert the move if invalid
-        cg.set({ fen: chess.fen() });
-        return;
-      }
-
-      // Update chessground FEN to match chess.js
-      cg.set({ fen: chess.fen() });
-
-      const played = moveToUci(move);
-      const isCorrect = played === bestMove;
-      
-      // Show loading state on eval bar
-      showEvalLoading();
-      
-      // Get evaluation for the user's actual move
-      try {
-        const response = await fetch(`/api/evaluate?fen=${encodeURIComponent(chess.fen())}`);
-        if (response.ok) {
-          const data = await response.json();
-          const userEval = data.cp / 100; // Convert centipawns to pawns
-          const userMate = data.mate;
-          
-          // Update eval bar with the user's move evaluation
-          hideEvalLoading();
-          updateEvalBar(userEval, userMate);
-          
-          // If the move is correct, add visual feedback
-          if (isCorrect) {
-            setTimeout(() => {
-              // Briefly highlight the eval bar in green
-              evalLabel.style.transition = "background-color 0.3s";
-              evalLabel.style.backgroundColor = "#d4edda";
-              setTimeout(() => {
-                evalLabel.style.backgroundColor = "";
-              }, 500);
-            }, 100);
-          }
-        } else {
-          // Fallback: if evaluation fails, show the expected eval for correct moves
-          hideEvalLoading();
-          if (isCorrect) {
-            updateEvalBar(evalAfter, mateAfter);
-          }
-          console.error("Failed to evaluate position");
-        }
-      } catch (error) {
-        console.error("Error evaluating position:", error);
-        // Fallback behavior
-        hideEvalLoading();
-        if (isCorrect) {
-          updateEvalBar(evalAfter, mateAfter);
-        }
-      }
-      
-      revealResult(isCorrect, played);
-    }
-
-    let cg;
-    try {
-      // Check for Chessground - it might be exposed as window.Chessground or just Chessground
-      const ChessgroundLib = window.Chessground || (typeof Chessground !== 'undefined' ? Chessground : null);
-      if (typeof Chess === "undefined" || !ChessgroundLib) {
-        throw new Error("Chess or Chessground not loaded");
-      }
-      const boardEl = document.getElementById('board');
-      cg = ChessgroundLib(boardEl, {
-        fen: fen,
-        orientation: sideToMove,
-        turnColor: sideToMove,
-        lastMove: lastMove,
-        movable: {
-          free: false,
-          color: sideToMove,
-          dests: getLegalMoves(chess),
-          events: {
-            after: (orig, dest) => handleMove(orig, dest)
-          }
-        },
-        drawable: {
-          enabled: true,
-          visible: true,
-          brushes: {
-            green: { key: 'g', color: '#15781B', opacity: 0.6, lineWidth: 10 },
-            red: { key: 'r', color: '#882020', opacity: 0.6, lineWidth: 10 }
-          }
-        }
-      });
-    } catch (err) {
-      console.error(err);
-    }
-
-    function clampEval(val) {
-      if (val > 10) return 10;
-      if (val < -10) return -10;
-      return val;
-    }
-
-    function updateEvalBar(value, mate) {
-      if (mate !== null && mate !== undefined) {
-        const isWhiteMate = mate > 0;
-        const mateDisplay = Math.abs(mate);
-        evalFill.style.height = "100%";
-        evalLabel.textContent = (isWhiteMate ? "M" : "-M") + mateDisplay;
-        if (isWhiteMate) {
-          evalLabel.classList.remove("black-advantage");
-          evalLabel.classList.add("white-advantage");
-        } else {
-          evalLabel.classList.remove("white-advantage");
-          evalLabel.classList.add("black-advantage");
-        }
-        return;
-      }
-      // Ensure value is a number
-      const numValue = typeof value === 'string' ? parseFloat(value) : value;
-      // Eval is always from white's perspective (white at top, black at bottom in eval bar)
-      const displayValue = numValue;
-      const clamped = clampEval(displayValue);
-      
-      // Reset eval bar to normal orientation (white at top, black at bottom)
-      const evalBar = evalFill.parentElement.parentElement;
-      evalBar.style.flexDirection = "column";
-      evalFill.style.top = "auto";
-      evalFill.style.bottom = "0";
-      
-      const percent = ((clamped + 10) / 20) * 100;
-      evalFill.style.height = percent + "%";
-      evalLabel.textContent = (displayValue >= 0 ? "+" : "") + displayValue.toFixed(1);
-      
-      // Update label styling based on advantage (from white's perspective)
-      if (displayValue >= 0) {
-        evalLabel.classList.remove("black-advantage");
-        evalLabel.classList.add("white-advantage");
-      } else {
-        evalLabel.classList.remove("white-advantage");
-        evalLabel.classList.add("black-advantage");
-      }
-    }
-
-    function contextualPrompt() {
-      // Determine if user is playing as white or black
-      const isUserWhite = sideToMove === "white";
-      
-      // Convert evaluation to user's perspective
-      const userEval = isUserWhite ? evalBefore : -evalBefore;
-      
-      if (mateBefore !== null && mateBefore !== undefined) {
-        const userMate = isUserWhite ? mateBefore : -mateBefore;
-        if (userMate > 0) {
-          return "Find the fastest mate";
-        } else if (userMate < 0) {
-          return "Find the only move to avoid mate";
-        }
-      }
-      
-      if (userEval > 2) return "Find the move to keep your advantage";
-      if (userEval > 0.5) return "Maintain the pressure with the best move";
-      if (userEval < -2) return "Find the move to stay in the game";
-      if (userEval < -0.5) return "Find the best defensive resource";
-      return "Find the best move in this balanced position";
-    }
-
-    function classificationNote() {
-      switch (classification) {
-        case "blunder": return "You missed a critical idea here.";
-        case "mistake": return "There was a better option.";
-        case "inaccuracy": return "A small improvement was possible.";
-        default: return "";
-      }
-    }
-
-    function revealResult(isCorrect, moveUci) {
-      attempted = true;
-      const loss = Math.abs(evalDiff).toFixed(1);
-      
-      // Calculate time taken
-      const timeElapsed = cardStartTime ? (Date.now() - cardStartTime) / 1000 : 0;
-      
-      if (isCorrect) {
-        feedbackEl.textContent = "Excellent! You found the best move.";
-        feedbackEl.classList.remove("has-text-danger");
-        feedbackEl.classList.add("has-text-success");
-        lossEl.textContent = "";
-      } else {
-        feedbackEl.textContent = `Not quite. The best move was ${bestMove}.`;
-        feedbackEl.classList.remove("has-text-success");
-        feedbackEl.classList.add("has-text-danger");
-        if (mateAfter !== null && mateAfter !== undefined) {
-          lossEl.textContent = mateAfter > 0
-            ? "Your move allows mate for White."
-            : "Your move allows mate for Black.";
-        } else {
-          lossEl.textContent = `Your original move lost ${loss} pawns of advantage.`;
-        }
-      }
-      metaEl.textContent = classificationNote();
-      
-      // Add hidden input for time
-      const timeInput = document.createElement('input');
-      timeInput.type = 'hidden';
-      timeInput.name = 'time_seconds';
-      timeInput.value = timeElapsed.toFixed(2);
-      reviewForm.appendChild(timeInput);
-      
-      reviewForm.classList.remove("is-hidden");
-      cg.set({ movable: { color: undefined } });
-    }
-
-    showAnswerBtn.addEventListener("click", function() {
-      if (attempted) return;
-      
-      // Calculate time taken
-      const timeElapsed = cardStartTime ? (Date.now() - cardStartTime) / 1000 : 0;
-      
-      // Draw arrow for best move
-      if (bestMove && bestMove.length >= 4) {
-        const from = bestMove.substring(0, 2);
-        const to = bestMove.substring(2, 4);
-        cg.setShapes([{ orig: from, dest: to, brush: 'green' }]);
-      }
-      
-      feedbackEl.textContent = `Best move: ${bestMove}`;
-      feedbackEl.classList.remove("has-text-danger");
-      feedbackEl.classList.add("has-text-info");
-      metaEl.textContent = classificationNote();
-      lossEl.textContent = `Original move (${movePlayed}) lost ${Math.abs(evalDiff).toFixed(1)} pawns.`;
-      
-      // Add hidden input for time
-      const timeInput = document.createElement('input');
-      timeInput.type = 'hidden';
-      timeInput.name = 'time_seconds';
-      timeInput.value = timeElapsed.toFixed(2);
-      reviewForm.appendChild(timeInput);
-      
-      reviewForm.classList.remove("is-hidden");
-      attempted = true;
-      cg.set({ movable: { color: undefined } });
-    });
-
-    // Set player names based on board orientation
-    function setupPlayerNames() {
-      const nameTop = document.getElementById("name-top");
-      const nameBottom = document.getElementById("name-bottom");
-      const iconTop = document.getElementById("icon-top");
-      const iconBottom = document.getElementById("icon-bottom");
-      
-      if (sideToMove === "white") {
-        // White at bottom, black at top
-        nameBottom.textContent = whitePlayer;
-        nameTop.textContent = blackPlayer;
-        iconBottom.classList.add("white");
-        iconTop.classList.add("black");
-      } else {
-        // Black at bottom, white at top
-        nameBottom.textContent = blackPlayer;
-        nameTop.textContent = whitePlayer;
-        iconBottom.classList.add("black");
-        iconTop.classList.add("white");
-      }
-    }
-
-    // Initial UI state
-    promptEl.textContent = contextualPrompt();
-    // Initialize eval bar immediately to avoid showing +0.0
-    updateEvalBar(evalBefore, mateBefore);
-    setupPlayerNames();
-    }
-    
-    // Wait for window load to ensure all scripts are loaded
-    if (window.addEventListener) {
-      window.addEventListener('load', initBoard);
-    } else if (window.attachEvent) {
-      window.attachEvent('onload', initBoard);
-    } else {
-      // Fallback: try after a delay
-      setTimeout(initBoard, 500);
-    }
-  })();
+  // No card data - page will handle empty state
 </script>
 {{end}}
 
 {{template "foot" .}}
 {{end}}
-

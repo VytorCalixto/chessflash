@@ -12,7 +12,9 @@ import (
 	"github.com/vytor/chessflash/internal/chesscom"
 	"github.com/vytor/chessflash/internal/config"
 	"github.com/vytor/chessflash/internal/db"
+	"github.com/vytor/chessflash/internal/jobs"
 	"github.com/vytor/chessflash/internal/logger"
+	"github.com/vytor/chessflash/internal/repository/sqlite"
 	"github.com/vytor/chessflash/internal/services"
 	"github.com/vytor/chessflash/internal/worker"
 )
@@ -67,13 +69,46 @@ func main() {
 	analysisPool := worker.NewPool(cfg.AnalysisWorkerCount, cfg.AnalysisQueueSize)
 	importPool := worker.NewPool(cfg.ImportWorkerCount, cfg.ImportQueueSize)
 
-	// Initialize services
-	profileService := services.NewProfileService(database)
-	gameService := services.NewGameService(database)
-	flashcardService := services.NewFlashcardService(database)
-	statsService := services.NewStatsService(database)
-	importService := services.NewImportService(database)
-	analysisService := services.NewAnalysisService()
+	// Initialize repositories
+	gameRepo := sqlite.NewGameRepository(database.DB)
+	positionRepo := sqlite.NewPositionRepository(database.DB)
+	flashcardRepo := sqlite.NewFlashcardRepository(database.DB)
+	profileRepo := sqlite.NewProfileRepository(database.DB)
+	statsRepo := sqlite.NewStatsRepository(database.DB)
+
+	// Initialize services (order matters - analysisService needs to be created before jobQueue)
+	profileService := services.NewProfileService(profileRepo)
+	analysisConfig := services.AnalysisConfig{
+		StockfishPath:  cfg.StockfishPath,
+		StockfishDepth: cfg.StockfishDepth,
+	}
+	analysisService := services.NewAnalysisService(
+		gameRepo,
+		positionRepo,
+		flashcardRepo,
+		statsRepo,
+		analysisConfig,
+	)
+	flashcardService := services.NewFlashcardService(flashcardRepo)
+	statsService := services.NewStatsService(statsRepo)
+
+	// Initialize job queue
+	chessClient := chesscom.New()
+	jobQueue := jobs.NewWorkerQueue(
+		analysisPool,
+		importPool,
+		database,
+		profileRepo,
+		analysisService,
+		chessClient,
+		cfg.StockfishPath,
+		cfg.StockfishDepth,
+		cfg.ArchiveLimit,
+		cfg.MaxConcurrentArchive,
+	)
+
+	gameService := services.NewGameService(gameRepo, positionRepo, jobQueue, database)
+	importService := services.NewImportService(jobQueue)
 
 	srv := &api.Server{
 		ProfileService:       profileService,

@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/flashcard"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
+	"github.com/vytor/chessflash/internal/repository"
 )
 
 // FlashcardService handles flashcard-related business logic
@@ -18,19 +18,19 @@ type FlashcardService interface {
 }
 
 type flashcardService struct {
-	db *db.DB
+	flashcardRepo repository.FlashcardRepository
 }
 
 // NewFlashcardService creates a new FlashcardService
-func NewFlashcardService(db *db.DB) FlashcardService {
-	return &flashcardService{db: db}
+func NewFlashcardService(flashcardRepo repository.FlashcardRepository) FlashcardService {
+	return &flashcardService{flashcardRepo: flashcardRepo}
 }
 
 func (s *flashcardService) GetNextFlashcard(ctx context.Context, profileID int64) (*models.FlashcardWithPosition, error) {
 	log := logger.FromContext(ctx)
 	log.Debug("getting next flashcard: profile_id=%d", profileID)
 
-	cards, err := s.db.NextFlashcards(ctx, profileID, 1)
+	cards, err := s.flashcardRepo.NextFlashcards(ctx, profileID, 1)
 	if err != nil {
 		log.Error("failed to get next flashcards: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -41,7 +41,7 @@ func (s *flashcardService) GetNextFlashcard(ctx context.Context, profileID int64
 		return nil, nil
 	}
 
-	card, err := s.db.FlashcardWithPosition(ctx, cards[0].ID, profileID)
+	card, err := s.flashcardRepo.FlashcardWithPosition(ctx, cards[0].ID, profileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.NewNotFoundError("flashcard", cards[0].ID)
@@ -63,7 +63,7 @@ func (s *flashcardService) ReviewFlashcard(ctx context.Context, flashcardID int6
 	}
 
 	// Get flashcard and verify it belongs to profile
-	card, err := s.db.FlashcardWithPosition(ctx, flashcardID, profileID)
+	card, err := s.flashcardRepo.FlashcardWithPosition(ctx, flashcardID, profileID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return errors.NewNotFoundError("flashcard", flashcardID)
@@ -83,14 +83,14 @@ func (s *flashcardService) ReviewFlashcard(ctx context.Context, flashcardID int6
 	log.Debug("applied review, new interval=%d days, ease_factor=%.2f", updated.IntervalDays, updated.EaseFactor)
 
 	// Update flashcard
-	if err := s.db.UpdateFlashcard(ctx, updated); err != nil {
+	if err := s.flashcardRepo.Update(ctx, updated); err != nil {
 		log.Error("failed to update flashcard: %v", err)
 		return errors.NewInternalError(err)
 	}
 
 	// Store review history with timing data (non-blocking)
 	if timeSeconds > 0 {
-		if err := s.db.InsertReviewHistory(ctx, card.ID, quality, timeSeconds); err != nil {
+		if err := s.flashcardRepo.InsertReviewHistory(ctx, card.ID, quality, timeSeconds); err != nil {
 			log.Warn("failed to store review history: %v", err)
 			// Don't fail the review if history storage fails
 		}

@@ -25,7 +25,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	log = log.WithField("username", username)
 	log.Info("starting game import for user")
 
-	s.ImportService.ImportGames(r.Context(), *profile, s.ImportPool, s.AnalysisPool, s.ChessClient, s.StockfishPath, s.StockfishDepth, s.ArchiveLimit, s.MaxConcurrentArchive)
+	s.ImportService.ImportGames(r.Context(), *profile)
 	log.Info("import job queued")
 	http.Redirect(w, r, "/games", http.StatusSeeOther)
 }
@@ -40,7 +40,7 @@ func (s *Server) handleResumeAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	count, err := s.GameService.ResumeAnalysis(ctx, profile.ID, s.AnalysisPool, s.StockfishPath, s.StockfishDepth)
+	count, err := s.GameService.ResumeAnalysis(ctx, profile.ID)
 	if err != nil {
 		handleError(w, r, err)
 		return
@@ -78,7 +78,7 @@ func (s *Server) handleQueueGameAnalysis(w http.ResponseWriter, r *http.Request)
 	}
 
 	ctx := r.Context()
-	if err := s.GameService.QueueGameAnalysis(ctx, id, profile.ID, s.AnalysisPool, s.StockfishPath, s.StockfishDepth); err != nil {
+	if err := s.GameService.QueueGameAnalysis(ctx, id, profile.ID); err != nil {
 		handleError(w, r, err)
 		return
 	}

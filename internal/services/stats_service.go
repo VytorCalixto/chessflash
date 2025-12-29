@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 
-	"github.com/vytor/chessflash/internal/db"
 	"github.com/vytor/chessflash/internal/errors"
 	"github.com/vytor/chessflash/internal/logger"
 	"github.com/vytor/chessflash/internal/models"
+	"github.com/vytor/chessflash/internal/repository"
 )
 
 // StatsService handles statistics-related business logic
@@ -27,25 +27,25 @@ type StatsService interface {
 }
 
 type statsService struct {
-	db *db.DB
+	statsRepo repository.StatsRepository
 }
 
 // NewStatsService creates a new StatsService
-func NewStatsService(db *db.DB) StatsService {
-	return &statsService{db: db}
+func NewStatsService(statsRepo repository.StatsRepository) StatsService {
+	return &statsService{statsRepo: statsRepo}
 }
 
 func (s *statsService) GetOpeningStats(ctx context.Context, profileID int64, limit, offset int) ([]models.OpeningStat, int, error) {
 	log := logger.FromContext(ctx)
 	log.Debug("getting opening stats: profile_id=%d, limit=%d, offset=%d", profileID, limit, offset)
 
-	stats, err := s.db.OpeningStats(ctx, profileID, limit, offset)
+	stats, err := s.statsRepo.OpeningStats(ctx, profileID, limit, offset)
 	if err != nil {
 		log.Error("failed to get opening stats: %v", err)
 		return nil, 0, errors.NewInternalError(err)
 	}
 
-	totalCount, err := s.db.CountOpeningStats(ctx, profileID)
+		totalCount, err := s.statsRepo.CountOpeningStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to count opening stats: %v", err)
 		return nil, 0, errors.NewInternalError(err)
@@ -58,13 +58,13 @@ func (s *statsService) GetOpponentStats(ctx context.Context, profileID int64, li
 	log := logger.FromContext(ctx)
 	log.Debug("getting opponent stats: profile_id=%d, limit=%d, offset=%d", profileID, limit, offset)
 
-	stats, err := s.db.OpponentStats(ctx, profileID, limit, offset, orderBy, orderDir)
+	stats, err := s.statsRepo.OpponentStats(ctx, profileID, limit, offset, orderBy, orderDir)
 	if err != nil {
 		log.Error("failed to get opponent stats: %v", err)
 		return nil, 0, errors.NewInternalError(err)
 	}
 
-	totalCount, err := s.db.CountOpponentStats(ctx, profileID)
+		totalCount, err := s.statsRepo.CountOpponentStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to count opponent stats: %v", err)
 		return nil, 0, errors.NewInternalError(err)
@@ -77,7 +77,7 @@ func (s *statsService) GetTimeClassStats(ctx context.Context, profileID int64) (
 	log := logger.FromContext(ctx)
 	log.Debug("getting time class stats: profile_id=%d", profileID)
 
-	stats, err := s.db.TimeClassStats(ctx, profileID)
+	stats, err := s.statsRepo.TimeClassStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get time class stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -90,7 +90,7 @@ func (s *statsService) GetColorStats(ctx context.Context, profileID int64) ([]mo
 	log := logger.FromContext(ctx)
 	log.Debug("getting color stats: profile_id=%d", profileID)
 
-	stats, err := s.db.ColorStats(ctx, profileID)
+	stats, err := s.statsRepo.ColorStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get color stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -103,7 +103,7 @@ func (s *statsService) GetMonthlyStats(ctx context.Context, profileID int64) ([]
 	log := logger.FromContext(ctx)
 	log.Debug("getting monthly stats: profile_id=%d", profileID)
 
-	stats, err := s.db.MonthlyStats(ctx, profileID)
+	stats, err := s.statsRepo.MonthlyStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get monthly stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -116,7 +116,7 @@ func (s *statsService) GetMistakePhaseStats(ctx context.Context, profileID int64
 	log := logger.FromContext(ctx)
 	log.Debug("getting mistake phase stats: profile_id=%d", profileID)
 
-	stats, err := s.db.MistakePhaseStats(ctx, profileID)
+	stats, err := s.statsRepo.MistakePhaseStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get mistake phase stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -129,7 +129,7 @@ func (s *statsService) GetRatingStats(ctx context.Context, profileID int64) ([]m
 	log := logger.FromContext(ctx)
 	log.Debug("getting rating stats: profile_id=%d", profileID)
 
-	stats, err := s.db.RatingStats(ctx, profileID)
+	stats, err := s.statsRepo.RatingStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get rating stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -142,7 +142,7 @@ func (s *statsService) GetFlashcardStats(ctx context.Context, profileID int64) (
 	log := logger.FromContext(ctx)
 	log.Debug("getting flashcard stats: profile_id=%d", profileID)
 
-	stats, err := s.db.FlashcardStats(ctx, profileID)
+	stats, err := s.statsRepo.FlashcardStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get flashcard stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -155,7 +155,7 @@ func (s *statsService) GetFlashcardClassificationStats(ctx context.Context, prof
 	log := logger.FromContext(ctx)
 	log.Debug("getting flashcard classification stats: profile_id=%d", profileID)
 
-	stats, err := s.db.FlashcardClassificationStats(ctx, profileID)
+	stats, err := s.statsRepo.FlashcardClassificationStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get classification stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -168,7 +168,7 @@ func (s *statsService) GetFlashcardPhaseStats(ctx context.Context, profileID int
 	log := logger.FromContext(ctx)
 	log.Debug("getting flashcard phase stats: profile_id=%d", profileID)
 
-	stats, err := s.db.FlashcardPhaseStats(ctx, profileID)
+	stats, err := s.statsRepo.FlashcardPhaseStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get phase stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -181,7 +181,7 @@ func (s *statsService) GetFlashcardOpeningStats(ctx context.Context, profileID i
 	log := logger.FromContext(ctx)
 	log.Debug("getting flashcard opening stats: profile_id=%d, limit=%d", profileID, limit)
 
-	stats, err := s.db.FlashcardOpeningStats(ctx, profileID, limit)
+	stats, err := s.statsRepo.FlashcardOpeningStats(ctx, profileID, limit)
 	if err != nil {
 		log.Error("failed to get opening stats: %v", err)
 		return nil, errors.NewInternalError(err)
@@ -194,7 +194,7 @@ func (s *statsService) GetFlashcardTimeStats(ctx context.Context, profileID int6
 	log := logger.FromContext(ctx)
 	log.Debug("getting flashcard time stats: profile_id=%d", profileID)
 
-	stats, err := s.db.FlashcardTimeStats(ctx, profileID)
+	stats, err := s.statsRepo.FlashcardTimeStats(ctx, profileID)
 	if err != nil {
 		log.Error("failed to get time stats: %v", err)
 		// Don't fail if time stats aren't available (no reviews yet)
@@ -208,7 +208,7 @@ func (s *statsService) RefreshStats(ctx context.Context, profileID int64) error 
 	log := logger.FromContext(ctx)
 	log.Debug("refreshing stats: profile_id=%d", profileID)
 
-	if err := s.db.RefreshProfileStats(ctx, profileID); err != nil {
+	if err := s.statsRepo.RefreshProfileStats(ctx, profileID); err != nil {
 		log.Error("failed to refresh stats: %v", err)
 		return errors.NewInternalError(err)
 	}
