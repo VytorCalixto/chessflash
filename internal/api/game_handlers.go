@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -39,6 +40,11 @@ func (s *Server) handleResumeAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Restart the analysis pool if it was stopped
+	// Use context.Background() instead of r.Context() because HTTP request contexts
+	// are cancelled when the request completes, which would stop the workers
+	s.AnalysisPool.Restart(context.Background())
+
 	ctx := r.Context()
 	count, err := s.GameService.ResumeAnalysis(ctx, profile.ID)
 	if err != nil {
@@ -48,6 +54,22 @@ func (s *Server) handleResumeAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("queued %d games for analysis resume", count)
 	http.Redirect(w, r, "/games", http.StatusSeeOther)
+}
+
+func (s *Server) handleStopAnalysis(w http.ResponseWriter, r *http.Request) {
+	log := logger.FromContext(r.Context())
+	profile := profileFromContext(r.Context())
+	if profile == nil {
+		log.Warn("no profile in context during stop analysis")
+		http.Redirect(w, r, "/profiles", http.StatusSeeOther)
+		return
+	}
+
+	log.Info("stopping background analysis")
+	s.AnalysisPool.Cancel()
+	log.Info("background analysis stopped")
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleQueueGameAnalysis(w http.ResponseWriter, r *http.Request) {

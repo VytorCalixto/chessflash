@@ -18,6 +18,11 @@
       </form>
     </p>
     <p class="control">
+      <form id="stop-form" method="post" action="/stop-analysis" style="display: inline;">
+        <button class="button is-danger" type="submit">Stop analysis</button>
+      </form>
+    </p>
+    <p class="control">
       <form method="POST" action="/analytics/refresh" style="display: inline;">
         <input type="hidden" name="redirect" value="/">
         <button type="submit" class="button is-light">
