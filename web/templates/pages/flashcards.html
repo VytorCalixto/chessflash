@@ -13,10 +13,11 @@
   }
   .board-wrapper {
     width: 480px;
-  }
-  #board {
-    width: 480px;
     height: 480px;
+  }
+  .cg-wrap {
+    width: 100%;
+    height: 100%;
   }
   .eval-bar {
     display: flex;
@@ -107,8 +108,9 @@
       width: 100%;
       max-width: 480px;
     }
-    #board {
+    .board-wrapper {
       width: 100%;
+      max-width: 480px;
       height: auto;
       aspect-ratio: 1;
     }
@@ -172,6 +174,8 @@
 {{if .card}}
 <script>
   (function() {
+    // Wait for all scripts to load
+    function initBoard() {
     const fen = "{{.card.FEN}}";
     const bestMove = "{{.card.BestMove}}".trim();
     // Convert centipawns to pawns (divide by 100) and ensure they're numbers
@@ -197,20 +201,79 @@
     const sideToMove = fen.split(" ")[1] === "w" ? "white" : "black";
     let attempted = false;
 
+    function getLegalMoves(chess) {
+      const dests = new Map();
+      const squares = ['a1','a2','a3','a4','a5','a6','a7','a8',
+                       'b1','b2','b3','b4','b5','b6','b7','b8',
+                       'c1','c2','c3','c4','c5','c6','c7','c8',
+                       'd1','d2','d3','d4','d5','d6','d7','d8',
+                       'e1','e2','e3','e4','e5','e6','e7','e8',
+                       'f1','f2','f3','f4','f5','f6','f7','f8',
+                       'g1','g2','g3','g4','g5','g6','g7','g8',
+                       'h1','h2','h3','h4','h5','h6','h7','h8'];
+      squares.forEach(s => {
+        const moves = chess.moves({ square: s, verbose: true });
+        if (moves.length) {
+          dests.set(s, moves.map(m => m.to));
+        }
+      });
+      return dests;
+    }
 
-    // Prefer local CDN/asset path if available; fall back to unpkg
-    const pieceThemeUrl = "/static/chessboard/img/chesspieces/wikipedia/{piece}.png";
-    let board;
-    try {
-      if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
-        throw new Error("Chess or Chessboard not loaded");
+    function moveToUci(moveObj) {
+      if (!moveObj) return "";
+      const promo = moveObj.promotion ? moveObj.promotion : "";
+      return `${moveObj.from}${moveObj.to}${promo}`;
+    }
+
+    function handleMove(orig, dest) {
+      if (attempted) return;
+
+      const move = chess.move({ from: orig, to: dest, promotion: 'q' });
+      if (!move) {
+        // Revert the move if invalid
+        cg.set({ fen: chess.fen() });
+        return;
       }
-      board = Chessboard("board", {
-        position: fen,
-        draggable: true,
+
+      // Update chessground FEN to match chess.js
+      cg.set({ fen: chess.fen() });
+
+      const played = moveToUci(move);
+      const isCorrect = played === bestMove;
+      // Update eval bar to show eval after the move
+      updateEvalBar(evalAfter);
+      revealResult(isCorrect, played);
+    }
+
+    let cg;
+    try {
+      // Check for Chessground - it might be exposed as window.Chessground or just Chessground
+      const ChessgroundLib = window.Chessground || (typeof Chessground !== 'undefined' ? Chessground : null);
+      if (typeof Chess === "undefined" || !ChessgroundLib) {
+        throw new Error("Chess or Chessground not loaded");
+      }
+      const boardEl = document.getElementById('board');
+      cg = ChessgroundLib(boardEl, {
+        fen: fen,
         orientation: sideToMove,
-        pieceTheme: pieceThemeUrl,
-        onDrop: handleDrop
+        turnColor: sideToMove,
+        movable: {
+          free: false,
+          color: sideToMove,
+          dests: getLegalMoves(chess),
+          events: {
+            after: (orig, dest) => handleMove(orig, dest)
+          }
+        },
+        drawable: {
+          enabled: true,
+          visible: true,
+          brushes: {
+            green: { key: 'g', color: '#15781B', opacity: 0.6, lineWidth: 10 },
+            red: { key: 'r', color: '#882020', opacity: 0.6, lineWidth: 10 }
+          }
+        }
       });
     } catch (err) {
       console.error(err);
@@ -266,12 +329,6 @@
       }
     }
 
-    function moveToUci(moveObj) {
-      if (!moveObj) return "";
-      const promo = moveObj.promotion ? moveObj.promotion : "";
-      return `${moveObj.from}${moveObj.to}${promo}`;
-    }
-
     function revealResult(isCorrect, moveUci) {
       attempted = true;
       const loss = Math.abs(evalDiff).toFixed(1);
@@ -288,24 +345,19 @@
       }
       metaEl.textContent = classificationNote();
       reviewForm.classList.remove("is-hidden");
-      board.draggable = false;
-    }
-
-    function handleDrop(source, target) {
-      if (attempted) return "snapback";
-
-      const move = chess.move({ from: source, to: target, promotion: "q" });
-      if (!move) return "snapback";
-
-      const played = moveToUci(move);
-      const isCorrect = played === bestMove;
-      // Update eval bar to show eval after the move
-      updateEvalBar(evalAfter);
-      revealResult(isCorrect, played);
+      cg.set({ movable: { color: undefined } });
     }
 
     showAnswerBtn.addEventListener("click", function() {
       if (attempted) return;
+      
+      // Draw arrow for best move
+      if (bestMove && bestMove.length >= 4) {
+        const from = bestMove.substring(0, 2);
+        const to = bestMove.substring(2, 4);
+        cg.setShapes([{ orig: from, dest: to, brush: 'green' }]);
+      }
+      
       feedbackEl.textContent = `Best move: ${bestMove}`;
       feedbackEl.classList.remove("has-text-danger");
       feedbackEl.classList.add("has-text-info");
@@ -313,7 +365,7 @@
       lossEl.textContent = `Original move (${movePlayed}) lost ${Math.abs(evalDiff).toFixed(1)} pawns.`;
       reviewForm.classList.remove("is-hidden");
       attempted = true;
-      board.draggable = false;
+      cg.set({ movable: { color: undefined } });
     });
 
     // Set player names based on board orientation
@@ -343,7 +395,17 @@
     // Initialize eval bar immediately to avoid showing +0.0
     updateEvalBar(evalBefore);
     setupPlayerNames();
-    _log("H3", "flashcards.js:ready", "ui ready", {});
+    }
+    
+    // Wait for window load to ensure all scripts are loaded
+    if (window.addEventListener) {
+      window.addEventListener('load', initBoard);
+    } else if (window.attachEvent) {
+      window.attachEvent('onload', initBoard);
+    } else {
+      // Fallback: try after a delay
+      setTimeout(initBoard, 500);
+    }
   })();
 </script>
 {{end}}
