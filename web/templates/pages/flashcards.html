@@ -220,18 +220,18 @@
 {{if .card}}
 <script id="flashcard-data" type="application/json">
 {
-  "fen": {{.card.FEN | json}},
-  "bestMove": {{.card.BestMove | json}},
+  "fen": "{{.card.FEN | jsonEscape}}",
+  "bestMove": "{{.card.BestMove | jsonEscape}}",
   "mateBefore": {{if .card.MateBefore}}{{.card.MateBefore}}{{else}}null{{end}},
   "mateAfter": {{if .card.MateAfter}}{{.card.MateAfter}}{{else}}null{{end}},
   "evalBefore": {{printf "%.2f" .card.EvalBefore}},
   "evalAfter": {{printf "%.2f" .card.EvalAfter}},
   "evalDiff": {{printf "%.2f" .card.EvalDiff}},
-  "classification": {{.card.Classification | json}},
-  "movePlayed": {{.card.MovePlayed | json}},
-  "prevMovePlayed": {{.card.PrevMovePlayed | json}},
-  "whitePlayer": {{.card.WhitePlayer | json}},
-  "blackPlayer": {{.card.BlackPlayer | json}}
+  "classification": "{{.card.Classification | jsonEscape}}",
+  "movePlayed": "{{.card.MovePlayed | jsonEscape}}",
+  "prevMovePlayed": {{if .card.PrevMovePlayed}}"{{.card.PrevMovePlayed | jsonEscape}}"{{else}}null{{end}},
+  "whitePlayer": "{{.card.WhitePlayer | jsonEscape}}",
+  "blackPlayer": "{{.card.BlackPlayer | jsonEscape}}"
 }
 </script>
 <script type="module" src="/static/js/flashcard/main.js"></script>

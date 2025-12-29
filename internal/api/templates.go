@@ -57,6 +57,20 @@ func LoadTemplates() (*template.Template, error) {
 			}
 			return string(b), nil
 		},
+		// jsonEscape escapes a string for safe use in JSON
+		"jsonEscape": func(s string) string {
+			b, err := json.Marshal(s)
+			if err != nil {
+				return ""
+			}
+			// Remove surrounding quotes from the marshaled string
+			// since we'll add them in the template
+			result := string(b)
+			if len(result) >= 2 && result[0] == '"' && result[len(result)-1] == '"' {
+				return result[1 : len(result)-1]
+			}
+			return result
+		},
 	}
 
 	t := template.New("base").Funcs(funcs)
