@@ -154,6 +154,29 @@ To build the Docker image manually:
 docker build -t chessflash:latest .
 ```
 
+### Using a Custom Stockfish Binary
+
+By default, the Dockerfile expects the Stockfish binary to be located at `stockfish-ubuntu-x86-64-avx2/stockfish/stockfish-ubuntu-x86-64-avx2` relative to the project root. If you have a Stockfish binary in a different location, you can specify it using the `STOCKFISH_BINARY_PATH` build argument:
+
+**Using docker build:**
+```bash
+docker build --build-arg STOCKFISH_BINARY_PATH=path/to/your/stockfish -t chessflash:latest .
+```
+
+**Using docker-compose:**
+Add the build argument to your `docker-compose.yml`:
+```yaml
+services:
+  chessflash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        STOCKFISH_BINARY_PATH: path/to/your/stockfish
+```
+
+The path should be relative to the project root (where the Dockerfile is located). The binary will be copied to `/usr/local/bin/stockfish` inside the container.
+
 To run the container manually:
 
 ```bash
