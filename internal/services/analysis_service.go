@@ -107,6 +107,22 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 		"result":     game.Result,
 	})
 
+	// Parse PGN early to determine expected move count for position validation
+	chessGame, err := s.parseGamePGN(ctx, game, log, gameID)
+	if err != nil {
+		return err
+	}
+
+	moves := chessGame.Moves()
+	expectedPositionCount := len(moves)
+
+	// Check if positions already exist (analysis may have completed but status wasn't updated)
+	if shouldSkip, err := s.checkAndHandleExistingPositions(ctx, gameID, expectedPositionCount, log); err != nil {
+		log.Warn("failed to check existing positions: %v, continuing with analysis", err)
+	} else if shouldSkip {
+		return nil
+	}
+
 	if err := s.gameRepo.UpdateStatus(ctx, gameID, "processing"); err != nil {
 		log.Error("failed to update game status: %v", err)
 		return err
@@ -118,15 +134,9 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 	}
 	defer s.pool.Release(engine)
 
-	chessGame, err := s.parseGamePGN(ctx, game, log, gameID)
-	if err != nil {
-		return err
-	}
-
 	s.detectOpeningIfMissing(ctx, game, chessGame, log)
 
 	positions := chessGame.Positions()
-	moves := chessGame.Moves()
 	log.Debug("analyzing %d moves", len(moves))
 
 	if len(positions) != len(moves)+1 {
@@ -141,6 +151,38 @@ func (s *analysisService) AnalyzeGame(ctx context.Context, gameID int64) error {
 
 	s.finalizeAnalysis(ctx, gameID, game.ProfileID, len(moves), analysisResult, log)
 	return nil
+}
+
+// checkAndHandleExistingPositions checks if positions already exist for a game.
+// Returns true if analysis should be skipped (positions exist and game marked as completed),
+// false if analysis should proceed, and an error if the check failed.
+func (s *analysisService) checkAndHandleExistingPositions(ctx context.Context, gameID int64, expectedPositionCount int, log *logger.Logger) (bool, error) {
+	existingPositions, err := s.positionRepo.PositionsForGame(ctx, gameID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(existingPositions) == 0 {
+		return false, nil
+	}
+
+	if len(existingPositions) == expectedPositionCount {
+		log.Info("game already has %d positions (matches expected %d moves), marking as completed", len(existingPositions), expectedPositionCount)
+		if err := s.gameRepo.UpdateStatus(ctx, gameID, "completed"); err != nil {
+			log.Error("failed to update game status to completed: %v", err)
+			return false, err
+		}
+		return true, nil
+	}
+
+	// Positions exist but count doesn't match - mark as completed to prevent re-queuing
+	// Note: Re-analyzing would fail due to unique constraint on (game_id, move_number)
+	log.Warn("game has %d positions but expected %d moves - analysis may be incomplete, marking as completed anyway", len(existingPositions), expectedPositionCount)
+	if err := s.gameRepo.UpdateStatus(ctx, gameID, "completed"); err != nil {
+		log.Error("failed to update game status to completed: %v", err)
+		return false, err
+	}
+	return true, nil
 }
 
 // analysisResult holds the results of analyzing a game
