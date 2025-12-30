@@ -5,8 +5,8 @@ import (
 	"embed"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed migrations/*.sql
@@ -26,6 +26,8 @@ func NewTestDB(t *testing.T) *sql.DB {
 		"migrations/0004_stats_cache.sql",
 		"migrations/0005_review_history.sql",
 		"migrations/0006_add_performance_indexes.sql",
+		"migrations/0008_add_unique_position_constraint.sql",
+		"migrations/0009_add_unique_flashcard_position.sql",
 	}
 
 	for _, migration := range migrations {
